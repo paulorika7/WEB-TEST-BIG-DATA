@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Big Data - O Adivinhador</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: #070712;
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+}
+#bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+#app { position: relative; z-index: 1; width: 100%; max-width: 620px; padding: 16px; }
+.screen { display: none; animation: fadeIn 0.6s ease; }
+.screen.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes dotPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes confetti-fall { 0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+@keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100vh); } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes barFill { from { width: 0%; } to { width: var(--w); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+header { text-align: center; margin-bottom: 24px; }
+header .logo-icon {
+  width: 68px; height: 68px;
+  background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+  border-radius: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 30px; margin-bottom: 12px;
+  box-shadow: 0 8px 32px rgba(99,102,241,0.35);
+  animation: float 3s ease-in-out infinite;
+  position: relative;
+}
+header .logo-icon::after {
+  content: ''; position: absolute; inset: 0; border-radius: 18px;
+  background: linear-gradient(135deg, transparent, rgba(255,255,255,0.1));
+}
+header h1 {
+  font-size: 26px; font-weight: 800; letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+header .subtitle {
+  color: #64748b; font-size: 13px; margin-top: 4px; font-weight: 400;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 1px;
+}
+header .subtitle span { color: #22c55e; }
+.section-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: #e2e8f0; display: flex; align-items: center; gap: 8px; }
+.section-title .badge {
+  font-size: 10px; background: rgba(99,102,241,0.2); color: #a5b4fc;
+  padding: 2px 8px; border-radius: 10px; font-weight: 500;
+}
+.categories-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.category-card {
+  background: linear-gradient(145deg, rgba(25,25,50,0.9), rgba(15,15,35,0.95));
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 14px; padding: 20px 14px; text-align: center;
+  cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden;
+}
+.category-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(135deg, transparent, rgba(99,102,241,0.08));
+  opacity: 0; transition: opacity 0.3s;
+}
+.category-card:hover { border-color: rgba(99,102,241,0.4); transform: translateY(-3px); box-shadow: 0 12px 36px rgba(99,102,241,0.15); }
+.category-card:hover::before { opacity: 1; }
+.category-card .emoji { font-size: 40px; margin-bottom: 8px; display: block; }
+.category-card .name { font-weight: 600; font-size: 15px; color: #e2e8f0; }
+.category-card .desc { font-size: 11px; color: #64748b; margin-top: 3px; }
+.category-card .count {
+  font-size: 10px; color: #475569; margin-top: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.thinking-box {
+  background: linear-gradient(145deg, rgba(25,25,50,0.9), rgba(15,15,35,0.95));
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 18px; padding: 32px 20px; text-align: center; margin-bottom: 14px; position: relative; overflow: hidden;
+}
+.thinking-box .scanline {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent);
+  animation: scanline 3s linear infinite; pointer-events: none;
+}
+.avatar { width: 90px; height: 90px; margin: 0 auto 16px; position: relative; }
+.avatar .orb {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+  box-shadow: 0 0 36px rgba(99,102,241,0.35);
+  display: flex; align-items: center; justify-content: center; font-size: 38px;
+  transition: all 0.5s; position: relative;
+}
+.avatar .orb.thinking { animation: pulse 0.8s ease-in-out infinite; }
+.avatar .orb.confident { box-shadow: 0 0 56px rgba(34,197,94,0.45); }
+.avatar .orb.sad { box-shadow: 0 0 36px rgba(239,68,68,0.35); }
+.avatar .ring {
+  position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px;
+  border: 1.5px solid rgba(99,102,241,0.15); border-radius: 50%;
+  animation: spin 5s linear infinite;
+}
+.avatar .ring:nth-child(2) {
+  top: -14px; left: -14px; right: -14px; bottom: -14px;
+  border-color: rgba(168,85,247,0.1); animation-duration: 7s; animation-direction: reverse;
+}
+.thinking-text { font-size: 20px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; min-height: 52px; }
+.thinking-sub { font-size: 13px; color: #64748b; font-weight: 300; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; }
+.progress-container { margin: 14px 0; }
+.progress-bar { height: 3px; background: rgba(99,102,241,0.12); border-radius: 2px; overflow: hidden; }
+.progress-bar .fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+  border-radius: 2px; transition: width 0.5s ease; width: 0%;
+}
+.progress-label { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+.btn-group { display: flex; gap: 6px; margin-top: 10px; }
+.btn {
+  flex: 1; padding: 11px 12px; border: none; border-radius: 10px;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+.btn:active { transform: scale(0.96); }
+.btn-yes { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
+.btn-yes:hover { box-shadow: 0 4px 16px rgba(34,197,94,0.35); }
+.btn-no { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
+.btn-no:hover { box-shadow: 0 4px 16px rgba(239,68,68,0.35); }
+.btn-maybe { background: linear-gradient(135deg, #eab308, #ca8a04); color: #fff; }
+.btn-maybe:hover { box-shadow: 0 4px 16px rgba(234,179,8,0.35); }
+.btn-idk { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.2); flex: 0.6; }
+.btn-idk:hover { background: rgba(100,116,139,0.25); }
+.btn-start, .btn-restart, .btn-category-confirm {
+  background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff;
+  padding: 14px 36px; font-size: 16px; border-radius: 14px;
+  font-family: 'Inter', sans-serif; font-weight: 700;
+}
+.btn-start:hover, .btn-restart:hover, .btn-category-confirm:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.4); }
+.result-box { text-align: center; padding: 36px 16px; }
+.result-box .big-emoji { font-size: 64px; margin-bottom: 16px; display: block; }
+.result-box h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+.result-box p { color: #94a3b8; margin-bottom: 20px; font-size: 14px; }
+.result-box .guess-item {
+  font-size: 32px; font-weight: 900;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin: 10px 0;
+}
+.confetti-piece {
+  position: fixed; width: 8px; height: 8px;
+  animation: confetti-fall 3s ease-in forwards;
+  z-index: 100; pointer-events: none;
+}
+.category-badge {
+  display: inline-block; padding: 3px 10px;
+  background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 16px; font-size: 11px; color: #a5b4fc; margin-bottom: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.pulse-dots { display: inline-flex; gap: 4px; margin-left: 4px; }
+.pulse-dots span { width: 5px; height: 5px; background: #6366f1; border-radius: 50%; display: inline-block; animation: dotPulse 1.2s ease-in-out infinite; }
+.pulse-dots span:nth-child(2) { animation-delay: 0.2s; }
+.pulse-dots span:nth-child(3) { animation-delay: 0.4s; }
+.toast {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(20,20,50,0.95); border: 1px solid rgba(99,102,241,0.25);
+  padding: 10px 20px; border-radius: 10px; font-size: 13px;
+  color: #e2e8f0; z-index: 200; animation: fadeIn 0.3s ease;
+  display: none; text-align: center; max-width: 88%;
+  font-family: 'JetBrains Mono', monospace;
+}
+.pct-badge {
+  font-size: 28px; font-weight: 900;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin: 6px 0;
+}
+
+/* Analytics Dashboard */
+.analytics-dash {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  margin: 10px 0 14px; font-family: 'JetBrains Mono', monospace;
+}
+.analytics-dash .metric {
+  background: rgba(15,15,40,0.6); border: 1px solid rgba(99,102,241,0.1);
+  border-radius: 8px; padding: 8px 10px;
+}
+.analytics-dash .metric .label { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+.analytics-dash .metric .value { font-size: 14px; font-weight: 700; color: #e2e8f0; margin-top: 2px; }
+.analytics-dash .metric .value.green { color: #22c55e; }
+.analytics-dash .metric .value.purple { color: #a5b4fc; }
+.analytics-dash .metric .value.pink { color: #f472b6; }
+.analytics-dash .metric .value.yellow { color: #facc15; }
+
+/* Data ticker */
+.data-ticker {
+  background: rgba(10,10,30,0.8); border: 1px solid rgba(99,102,241,0.08);
+  border-radius: 6px; padding: 6px 10px; margin: 8px 0 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: #475569; overflow: hidden; white-space: nowrap;
+  height: 22px; line-height: 22px;
+}
+.data-ticker .ticker-inner {
+  display: inline-block; animation: tickerScroll 20s linear infinite;
+}
+@keyframes tickerScroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* Processing stages */
+.processing-stage {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 8px 0; font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: #64748b;
+}
+.processing-stage .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #6366f1; opacity: 0.3;
+}
+.processing-stage .dot.active { opacity: 1; animation: pulse 0.6s ease-in-out infinite; }
+.processing-stage .dot.done { opacity: 1; background: #22c55e; }
+
+/* Confidence bars */
+.confidence-viz { margin: 10px 0; }
+.confidence-viz .bar-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px; font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+.confidence-viz .bar-row .bar-label {
+  width: 90px; text-align: right; color: #94a3b8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.confidence-viz .bar-row .bar-track {
+  flex: 1; height: 6px; background: rgba(99,102,241,0.08);
+  border-radius: 3px; overflow: hidden;
+}
+.confidence-viz .bar-row .bar-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  transition: width 0.4s ease;
+}
+.confidence-viz .bar-row .bar-pct {
+  width: 36px; color: #64748b;
+}
+
+/* Data source footer */
+.data-footer {
+  text-align: center; margin-top: 20px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  color: #1e293b; line-height: 1.6;
+}
+.data-footer .servers { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.data-footer .servers span { color: #334155; }
+
+@media (max-width: 480px) {
+  #app { padding: 12px; }
+  header h1 { font-size: 20px; }
+  .categories-grid { gap: 8px; }
+  .category-card { padding: 14px 10px; }
+  .category-card .emoji { font-size: 32px; }
+  .thinking-text { font-size: 17px; min-height: 44px; }
+  .btn { font-size: 11px; padding: 9px 10px; }
+  .btn-group { gap: 4px; }
+  .result-box .guess-item { font-size: 26px; }
+  .analytics-dash { gap: 4px; }
+  .analytics-dash .metric { padding: 6px 8px; }
+  .analytics-dash .metric .value { font-size: 12px; }
+  .confidence-viz .bar-row .bar-label { width: 60px; font-size: 9px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div id="toast" class="toast"></div>
+
+<div id="app">
+  <!-- HOME -->
+  <div id="screen-home" class="screen active">
+    <header>
+      <div class="logo-icon">🧠</div>
+      <h1>Big Data</h1>
+      <div class="subtitle"><span>●</span> SISTEMA DE ADIVINHAÇÃO INTELIGENTE v3.0 <span>●</span></div>
+    </header>
+    <div class="section-title">
+      <span>📊 BASE DE CONHECIMENTOS</span>
+      <span class="badge" id="total-items-badge">500 itens</span>
+    </div>
+    <div class="categories-grid" id="category-grid"></div>
+    <div class="data-footer">
+      <div class="servers">
+        <span>🖥️ srv-01.nyc</span>
+        <span>🖥️ srv-02.sfo</span>
+        <span>🖥️ srv-03.gru</span>
+        <span>🖥️ srv-04.lon</span>
+      </div>
+      <div style="margin-top:4px;">Big Data Analytics Engine — 42 TB de dados processados</div>
+    </div>
+  </div>
+
+  <!-- CATEGORY CONFIRM -->
+  <div id="screen-category" class="screen">
+    <header>
+      <div class="logo-icon" style="width:52px;height:52px;font-size:22px;margin-bottom:8px;">🧠</div>
+      <h1 style="font-size:18px;">Big Data</h1>
+      <div class="subtitle" style="font-size:10px;">INICIALIZANDO MOTOR DE ANÁLISE</div>
+    </header>
+    <div class="thinking-box">
+      <div class="scanline"></div>
+      <div class="avatar">
+        <div class="orb" id="category-orb">🔮</div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+      </div>
+      <div class="thinking-text" id="category-text">Pense em algo relacionado a <strong id="category-name-display"></strong></div>
+      <div class="thinking-sub">Estou consultando minha base com <span id="category-item-count">0</span> registros</div>
+      <div class="processing-stage">
+        <span class="dot done"></span><span>Indexando base</span>
+        <span class="dot done"></span><span>Carregando tags</span>
+        <span class="dot active"></span><span>Aguardando input</span>
+      </div>
+    </div>
+    <button class="btn btn-category-confirm" style="width:100%;" onclick="startGame()">🧠 Pronto, pensei! — Iniciar análise</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="screen">
+    <header style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;">
+        <div class="logo-icon" style="width:36px;height:36px;font-size:16px;margin:0;border-radius:10px;">🧠</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#e2e8f0;">Big Data</div>
+          <div class="category-badge" id="game-category-badge" style="margin:0;">🎬 Netflix</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="data-ticker" id="data-ticker">
+      <span class="ticker-inner" id="ticker-text">▶ Processando consulta distribuída... aguarde...</span>
+    </div>
+
+    <div class="thinking-box">
+      <div class="scanline"></div>
+      <div class="avatar">
+        <div class="orb thinking" id="game-orb">🤔</div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+      </div>
+      <div class="thinking-text" id="question-text">Carregando...</div>
+      <div class="processing-stage" id="processing-stage">
+        <span class="dot" data-stage="0"></span><span data-stage="0">Consultando BD</span>
+        <span class="dot" data-stage="1"></span><span data-stage="1">Analisando padrões</span>
+        <span class="dot" data-stage="2"></span><span data-stage="2">Cruzando dados</span>
+        <span class="dot" data-stage="3"></span><span data-stage="3">Calculando</span>
+      </div>
+    </div>
+
+    <div class="analytics-dash" id="analytics-dash">
+      <div class="metric"><div class="label">Itens Restantes</div><div class="value" id="metric-items">125</div></div>
+      <div class="metric"><div class="label">Entropia</div><div class="value purple" id="metric-entropy">0.00</div></div>
+      <div class="metric"><div class="label">Confiança</div><div class="value green" id="metric-confidence">0%</div></div>
+      <div class="metric"><div class="label">Pergunta</div><div class="value yellow" id="metric-question">1/15</div></div>
+    </div>
+
+    <div class="progress-container">
+      <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
+      <div class="progress-label">
+        <span>▶ Processando...</span>
+        <span><span id="progress-pct">0</span>% · <span id="question-counter">Pergunta 1/15</span></span>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-yes" onclick="answerQuestion('yes')">👍 Sim</button>
+      <button class="btn btn-maybe" onclick="answerQuestion('maybe')">🤔 Talvez</button>
+      <button class="btn btn-idk" onclick="answerQuestion('idk')">Não sei</button>
+      <button class="btn btn-no" onclick="answerQuestion('no')">👎 Não</button>
+    </div>
+
+    <div class="data-footer">
+      <div class="servers" id="game-servers">
+        <span>🖥️ srv-01.nyc <span style="color:#22c55e;">● ativo</span></span>
+        <span>🖥️ srv-02.sfo <span style="color:#22c55e;">● ativo</span></span>
+        <span>🖥️ srv-03.gru <span style="color:#22c55e;">● ativo</span></span>
+        <span>🖥️ srv-04.lon <span style="color:#22c55e;">● ativo</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- GUESS -->
+  <div id="screen-guess" class="screen">
+    <header style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;">
+        <div class="logo-icon" style="width:36px;height:36px;font-size:16px;margin:0;border-radius:10px;">🧠</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#e2e8f0;">Big Data</div>
+          <div class="category-badge" id="guess-category-badge" style="margin:0;">🎬 Netflix</div>
+        </div>
+      </div>
+    </header>
+    <div class="thinking-box">
+      <div class="scanline"></div>
+      <div class="avatar">
+        <div class="orb confident" id="guess-orb">🎯</div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+      </div>
+      <div class="thinking-sub" style="font-size:11px;color:#475569;font-weight:400;">ANÁLISE CONCLUÍDA · RESULTADO DO ALGORITMO</div>
+      <div class="thinking-text" style="font-size:16px;">Você está pensando em...</div>
+      <div class="guess-item" id="guess-item-name">────────</div>
+      <div class="pct-badge" id="guess-confidence">99%</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#475569;margin-top:4px;">
+        Confiança: <span id="guess-raw-confidence" style="color:#22c55e;">99%</span> · Dados analisados: <span id="guess-data-points" style="color:#a5b4fc;">125</span>
+      </div>
+      <div class="thinking-sub" style="margin-top:10px;">Acertou?</div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-yes" onclick="confirmGuess(true)">🎉 Sim, acertou!</button>
+      <button class="btn btn-no" onclick="confirmGuess(false)">❌ Não, errou</button>
+    </div>
+    <div class="data-footer" style="margin-top:12px;">
+      <span>🧠 Big Data Engine · v3.0 · Precisão geral: 96.4%</span>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="screen-result" class="screen">
+    <header>
+      <div class="logo-icon" style="width:48px;height:48px;font-size:20px;margin-bottom:8px;">🧠</div>
+      <h1 style="font-size:18px;">Big Data</h1>
+      <div class="subtitle" style="font-size:10px;">RELATÓRIO DE ANÁLISE</div>
+    </header>
+    <div id="result-content" class="thinking-box">
+      <div class="scanline"></div>
+      <div class="result-box">
+        <span class="big-emoji" id="result-emoji">🎉</span>
+        <h2 id="result-title">Acertei!</h2>
+        <div id="result-item" class="guess-item">───</div>
+        <div id="result-stats" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#475569;margin-bottom:12px;"></div>
+        <p id="result-subtitle">Eu sabia! Meus dados nunca falham.</p>
+        <button class="btn btn-restart" onclick="resetGame()">🔄 Jogar novamente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// BIG DATA ENGINE
+// ============================================================
+
+const CATEGORIES = [
+  { id: 'netflix', name: 'Netflix', emoji: '🎬', desc: 'Séries, filmes e originais' },
+  { id: 'tiktok', name: 'TikTok', emoji: '📱', desc: 'Criadores, trends e virais' },
+  { id: 'travel', name: 'Viagens', emoji: '✈️', desc: 'Destinos pelo mundo' },
+  { id: 'music', name: 'Músicas', emoji: '🎵', desc: 'Artistas, músicas e estilos' }
+];
+
+// --- DATA: BIG DATA v3 (584 registros) ---
+const ITEMS = {
+  netflix: [
+    { name: 'Squid Game', tags: ['thriller','drama','survival','korean','mystery'] },
+    { name: 'Wednesday', tags: ['fantasy','comedy','mystery','teen','supernatural','horror'] },
+    { name: 'Stranger Things', tags: ['drama','sci-fi','fantasy','horror','mystery','teen','supernatural','survival'] },
+    { name: 'Bridgerton', tags: ['romance','drama','historical','period','family'] },
+    { name: 'The Crown', tags: ['drama','historical','british','period'] },
+    { name: 'Money Heist', tags: ['crime','thriller','action','heist','spanish'] },
+    { name: 'The Witcher', tags: ['fantasy','action','adventure','drama','supernatural'] },
+    { name: 'Ozark', tags: ['crime','drama','thriller','mystery'] },
+    { name: 'You', tags: ['thriller','crime','psychological','romance','drama'] },
+    { name: 'Sex Education', tags: ['comedy','drama','teen','british'] },
+    { name: 'Lucifer', tags: ['fantasy','crime','comedy','supernatural','mystery'] },
+    { name: 'Lupin', tags: ['crime','thriller','action','heist','french'] },
+    { name: 'Outer Banks', tags: ['adventure','drama','mystery','teen','survival'] },
+    { name: 'Alice in Borderland', tags: ['sci-fi','thriller','survival','japanese','mystery'] },
+    { name: 'Arcane', tags: ['animation','fantasy','action','sci-fi','drama'] },
+    { name: 'One Piece', tags: ['fantasy','adventure','action','comedy','japanese'] },
+    { name: '3 Body Problem', tags: ['sci-fi','drama','mystery','thriller'] },
+    { name: 'Black Mirror', tags: ['sci-fi','thriller','anthology','psychological','british'] },
+    { name: 'Cobra Kai', tags: ['action','comedy','drama','teen','martial-arts'] },
+    { name: 'Heartstopper', tags: ['romance','comedy','drama','teen','british'] },
+    { name: 'The Sandman', tags: ['fantasy','horror','supernatural','drama','mystery'] },
+    { name: 'The Diplomat', tags: ['thriller','drama','political','mystery'] },
+    { name: 'Beef', tags: ['comedy','drama','psychological','thriller'] },
+    { name: 'Ginny & Georgia', tags: ['comedy','drama','teen','romance','family'] },
+    { name: 'Virgin River', tags: ['romance','drama','family'] },
+    { name: 'All of Us Are Dead', tags: ['horror','thriller','survival','korean','zombie'] },
+    { name: 'Manifest', tags: ['supernatural','drama','mystery','thriller','adventure'] },
+    { name: 'Lincoln Lawyer', tags: ['crime','drama','mystery','thriller'] },
+    { name: 'Mindhunter', tags: ['crime','drama','thriller','psychological','historical'] },
+    { name: 'Narcos', tags: ['crime','drama','thriller','historical'] },
+    { name: 'Dahmer', tags: ['crime','drama','thriller','psychological','true-crime'] },
+    { name: 'The Queen\'s Gambit', tags: ['drama','thriller','historical','period'] },
+    { name: 'The Night Agent', tags: ['action','thriller','mystery','drama'] },
+    { name: 'Emily in Paris', tags: ['comedy','romance','drama','french'] },
+    { name: 'Red Notice', tags: ['action','comedy','heist','adventure','thriller'] },
+    { name: 'Don\'t Look Up', tags: ['comedy','sci-fi','drama'] },
+    { name: 'The Adam Project', tags: ['sci-fi','action','adventure','comedy','family'] },
+    { name: 'Bird Box', tags: ['horror','thriller','sci-fi','survival','supernatural'] },
+    { name: 'The Gray Man', tags: ['action','thriller','adventure'] },
+    { name: 'Damsel', tags: ['fantasy','action','adventure','drama','survival'] },
+    { name: 'The Platform', tags: ['sci-fi','horror','thriller','survival','spanish'] },
+    { name: 'Society of the Snow', tags: ['drama','survival','historical'] },
+    { name: 'Glass Onion', tags: ['mystery','comedy','crime','thriller'] },
+    { name: 'Extraction', tags: ['action','thriller','survival','adventure'] },
+    { name: 'Enola Holmes', tags: ['mystery','comedy','adventure','family','british'] },
+    { name: 'Murder Mystery', tags: ['comedy','mystery','crime','romance','adventure'] },
+    { name: 'Love Death & Robots', tags: ['animation','sci-fi','anthology','fantasy','horror'] },
+    { name: 'The Fall of the House of Usher', tags: ['horror','drama','thriller','supernatural','psychological'] },
+    { name: 'Baby Reindeer', tags: ['drama','thriller','psychological','british','true-crime'] },
+    { name: 'Carry-On', tags: ['action','thriller','mystery','survival'] },
+    { name: 'Back in Action', tags: ['action','comedy','thriller'] },
+    { name: 'Leave the World Behind', tags: ['drama','thriller','mystery','psychological'] },
+    { name: 'The Mother', tags: ['action','thriller','drama','survival'] },
+    { name: 'KPop Demon Hunters', tags: ['animation','fantasy','action','korean'] },
+    { name: 'Troll', tags: ['fantasy','action','adventure','norwegian'] },
+    { name: 'Under Paris', tags: ['horror','thriller','survival','french'] },
+    { name: 'Nowhere', tags: ['thriller','survival','drama','spanish'] },
+    { name: 'Hustle', tags: ['drama','sports','comedy'] },
+    { name: 'The Tinder Swindler', tags: ['crime','documentary','true-crime','thriller'] },
+    { name: 'Rebel Ridge', tags: ['action','thriller','crime','mystery'] },
+    { name: 'Luther', tags: ['crime','drama','thriller','psychological','british'] },
+    { name: 'Heart of Stone', tags: ['action','thriller','adventure'] },
+    { name: 'The Union', tags: ['action','comedy','thriller'] },
+    { name: 'Lift', tags: ['action','comedy','heist','adventure'] },
+    { name: 'Adolescence', tags: ['drama','crime','psychological','british'] },
+    { name: 'La Palma', tags: ['drama','thriller','survival','norwegian'] },
+    { name: 'Dark', tags: ['sci-fi','thriller','mystery','supernatural','german'] },
+    { name: 'Elite', tags: ['drama','crime','thriller','teen','spanish'] },
+    { name: 'The Umbrella Academy', tags: ['sci-fi','fantasy','action','comedy','supernatural'] },
+    { name: 'The Dragon Prince', tags: ['animation','fantasy','adventure','family'] },
+    { name: 'Bojack Horseman', tags: ['animation','comedy','drama','psychological'] },
+    { name: 'Big Mouth', tags: ['animation','comedy','teen'] },
+    { name: 'Disenchantment', tags: ['animation','comedy','fantasy','adventure'] },
+    { name: 'Castlevania', tags: ['animation','fantasy','horror','action','supernatural'] },
+    { name: 'Cyberpunk Edgerunners', tags: ['animation','sci-fi','action','drama'] },
+    { name: 'Narcos Mexico', tags: ['crime','drama','thriller','historical'] },
+    { name: 'The Last Kingdom', tags: ['historical','action','drama','adventure','period'] },
+    { name: 'Vikings Valhalla', tags: ['historical','action','drama','adventure'] },
+    { name: 'Peaky Blinders', tags: ['crime','drama','thriller','historical','british'] },
+    { name: 'Top Boy', tags: ['crime','drama','thriller','british'] },
+    { name: 'Suits', tags: ['drama','comedy','legal'] },
+    { name: 'The Recruit', tags: ['action','thriller','spy','comedy'] },
+    { name: 'FUBAR', tags: ['action','comedy','adventure'] },
+    { name: 'The Old Guard', tags: ['action','fantasy','adventure','supernatural'] },
+    { name: '6 Underground', tags: ['action','thriller','adventure'] },
+    { name: 'Spenser Confidential', tags: ['action','crime','comedy'] },
+    { name: 'The Irishman', tags: ['crime','drama','historical','biopic'] },
+    { name: 'Marriage Story', tags: ['drama','romance'] },
+    { name: 'Roma', tags: ['drama','historical','spanish'] },
+    { name: 'The Power of the Dog', tags: ['drama','psychological','western'] },
+    { name: 'All Quiet on the Western Front', tags: ['drama','historical','war','german'] },
+    { name: 'The Pale Blue Eye', tags: ['mystery','crime','thriller','historical','psychological'] },
+    { name: 'The Staircase', tags: ['crime','documentary','true-crime','mystery'] },
+    { name: 'Making a Murderer', tags: ['documentary','crime','true-crime'] },
+    { name: 'Tiger King', tags: ['documentary','crime','true-crime'] },
+    { name: 'Our Planet', tags: ['documentary','nature'] },
+    { name: 'Night on Earth', tags: ['documentary','nature'] },
+    { name: 'Abstract', tags: ['documentary','design'] },
+    { name: 'Chef\'s Table', tags: ['documentary','food'] },
+    { name: 'Salt Fat Acid Heat', tags: ['documentary','food'] },
+    { name: 'The Goop Lab', tags: ['documentary','lifestyle'] },
+    { name: 'Explained', tags: ['documentary','anthology'] },
+    { name: 'Russian Doll', tags: ['comedy','drama','sci-fi','mystery'] },
+    { name: 'Dead to Me', tags: ['comedy','drama','crime','mystery'] },
+    { name: 'Grace and Frankie', tags: ['comedy','drama','family'] },
+    { name: 'The Kominsky Method', tags: ['comedy','drama'] },
+    { name: 'After Life', tags: ['comedy','drama','british'] },
+    { name: 'Schitt\'s Creek', tags: ['comedy','family'] },
+    { name: 'Unbreakable Kimmy Schmidt', tags: ['comedy'] },
+    { name: 'The Good Place', tags: ['comedy','fantasy','sci-fi'] },
+    { name: 'Santa Clarita Diet', tags: ['comedy','horror','supernatural'] },
+    { name: 'iZombie', tags: ['comedy','crime','supernatural','zombie'] },
+    { name: 'Sweet Tooth', tags: ['fantasy','adventure','drama','sci-fi'] },
+    { name: 'Shadow and Bone', tags: ['fantasy','adventure','action','drama'] },
+    { name: 'Cursed', tags: ['fantasy','adventure','drama','historical'] },
+    { name: 'Locke & Key', tags: ['fantasy','horror','mystery','supernatural','teen'] },
+    { name: 'The Order', tags: ['fantasy','horror','supernatural','teen'] },
+    { name: 'Chilling Adventures of Sabrina', tags: ['fantasy','horror','supernatural','teen','drama'] },
+    { name: 'The Haunting of Hill House', tags: ['horror','drama','supernatural','psychological'] },
+    { name: 'The Haunting of Bly Manor', tags: ['horror','drama','supernatural','romance'] },
+    { name: 'Midnight Mass', tags: ['horror','drama','supernatural','mystery'] },
+    { name: 'Archive 81', tags: ['horror','mystery','supernatural','thriller'] },
+    { name: 'Brand New Cherry Flavor', tags: ['horror','thriller','supernatural','psychological'] },
+    { name: 'Behind Her Eyes', tags: ['thriller','mystery','psychological','supernatural'] },
+    { name: 'Stay Close', tags: ['thriller','mystery','crime','drama'] },
+    { name: 'Safe', tags: ['thriller','mystery','crime','british'] },
+    { name: 'The Stranger', tags: ['thriller','mystery','crime','british'] },
+    { name: 'Clickbait', tags: ['thriller','mystery','crime','drama'] },
+    { name: 'The Woods', tags: ['thriller','mystery','crime','polish'] },
+    { name: 'The Frozen Dead', tags: ['thriller','crime','mystery','french'] },
+    { name: 'Marianne', tags: ['horror','supernatural','french'] },
+    { name: 'Into the Night', tags: ['sci-fi','thriller','survival','french'] },
+    { name: 'Yakamoz S-245', tags: ['sci-fi','thriller','survival','turkish'] },
+    { name: 'The Protector', tags: ['fantasy','action','supernatural','turkish'] },
+    { name: 'Kingdom', tags: ['horror','historical','thriller','korean','zombie'] },
+    { name: 'Hellbound', tags: ['horror','fantasy','supernatural','thriller','korean'] },
+    { name: 'Sweet Home', tags: ['horror','thriller','survival','korean','supernatural'] },
+    { name: 'The Silent Sea', tags: ['sci-fi','thriller','survival','korean'] },
+    { name: 'My Name', tags: ['action','crime','thriller','korean'] },
+    { name: 'The Glory', tags: ['drama','thriller','psychological','korean'] },
+    { name: 'Crash Landing on You', tags: ['romance','drama','comedy','korean'] },
+    { name: 'It\'s Okay to Not Be Okay', tags: ['romance','drama','psychological','korean'] },
+    { name: 'Hospital Playlist', tags: ['drama','comedy','korean'] },
+    { name: 'Signal', tags: ['sci-fi','crime','thriller','korean','mystery'] },
+    { name: 'Stranger', tags: ['crime','thriller','drama','korean','mystery'] },
+    { name: 'Mr. Sunshine', tags: ['drama','historical','romance','korean'] },
+    { name: 'The King\'s Affection', tags: ['romance','drama','historical','korean'] },
+    { name: 'Business Proposal', tags: ['romance','comedy','korean'] },
+    { name: 'What\'s Wrong with Secretary Kim', tags: ['romance','comedy','korean'] },
+    { name: 'Hometown Cha-Cha-Cha', tags: ['romance','comedy','korean'] },
+    { name: 'Start-Up', tags: ['drama','romance','korean'] },
+    { name: 'Vincenzo', tags: ['crime','comedy','drama','korean'] },
+    { name: 'Taxi Driver', tags: ['action','crime','thriller','korean'] },
+    { name: 'The Penthouse', tags: ['drama','crime','thriller','korean'] },
+    { name: 'Sky Castle', tags: ['drama','thriller','korean'] },
+    { name: 'Reply 1988', tags: ['comedy','drama','family','korean'] },
+    { name: 'Prison Playbook', tags: ['comedy','drama','korean'] },
+    { name: 'Chicago Typewriter', tags: ['fantasy','romance','drama','korean'] },
+    { name: 'Goblin', tags: ['fantasy','romance','drama','supernatural','korean'] },
+    { name: 'Descendants of the Sun', tags: ['romance','drama','action','korean'] },
+    { name: 'Weightlifting Fairy', tags: ['romance','comedy','korean','sports'] },
+    { name: 'Strong Woman Bong-soon', tags: ['comedy','romance','action','korean'] },
+    { name: 'Fight for My Way', tags: ['comedy','romance','korean'] },
+    { name: 'While You Were Sleeping', tags: ['fantasy','romance','thriller','korean'] },
+    { name: 'W: Two Worlds', tags: ['fantasy','romance','thriller','korean'] },
+    { name: 'Hotel Del Luna', tags: ['fantasy','romance','drama','supernatural','korean'] },
+    { name: 'True Beauty', tags: ['comedy','romance','teen','korean'] },
+    { name: 'Extraordinary You', tags: ['fantasy','romance','comedy','korean'] },
+    { name: 'The Heirs', tags: ['romance','drama','teen','korean'] },
+    { name: 'Boys Over Flowers', tags: ['romance','drama','teen','korean'] },
+    { name: 'My ID is Gangnam Beauty', tags: ['romance','drama','teen','korean'] },
+    { name: 'Love Alarm', tags: ['romance','sci-fi','teen','korean'] },
+    { name: 'Nevertheless', tags: ['romance','drama','korean'] },
+    { name: 'Twenty-Five Twenty-One', tags: ['romance','drama','korean'] },
+    { name: 'Our Beloved Summer', tags: ['romance','comedy','korean'] },
+    { name: 'The Sound of Magic', tags: ['fantasy','musical','drama','korean'] },
+    { name: 'Juvenile Justice', tags: ['crime','drama','korean'] }
+  ],
+  tiktok: [
+    { name: 'Khaby Lame', tags: ['comedy','reaction','male','solo'] },
+    { name: 'Charli D\'Amelio', tags: ['dance','lifestyle','female','solo'] },
+    { name: 'MrBeast', tags: ['entertainment','male','solo'] },
+    { name: 'Bella Poarch', tags: ['music','lip-sync','female','solo'] },
+    { name: 'Addison Rae', tags: ['dance','beauty','lifestyle','female','solo'] },
+    { name: 'Zach King', tags: ['entertainment','visual-effects','male','solo'] },
+    { name: 'The Rock', tags: ['fitness','male','solo','entertainment'] },
+    { name: 'Will Smith', tags: ['comedy','lifestyle','male','solo','entertainment'] },
+    { name: 'Kimberly Loaiza', tags: ['lifestyle','music','beauty','female','solo'] },
+    { name: 'CZN Burak', tags: ['food','male','solo','entertainment'] },
+    { name: 'Billie Eilish', tags: ['music','lifestyle','female','solo','entertainment'] },
+    { name: 'BTS', tags: ['music','dance','group','entertainment'] },
+    { name: 'Jason Derulo', tags: ['music','dance','male','solo','entertainment'] },
+    { name: 'Kylie Jenner', tags: ['lifestyle','beauty','female','solo','fashion'] },
+    { name: 'Spencer X', tags: ['music','entertainment','male','solo'] },
+    { name: 'Bayashi', tags: ['food','male','solo'] },
+    { name: 'Loren Gray', tags: ['music','dance','beauty','female','solo'] },
+    { name: 'BLACKPINK', tags: ['music','dance','group','fashion'] },
+    { name: 'KallMeKris', tags: ['comedy','female','solo','entertainment'] },
+    { name: 'Brent Rivera', tags: ['comedy','prank','male','solo','lifestyle'] },
+    { name: 'JoJo Siwa', tags: ['music','dance','female','solo','entertainment'] },
+    { name: 'IShowSpeed', tags: ['gaming','entertainment','male','solo'] },
+    { name: 'James Charles', tags: ['beauty','male','solo','tutorial'] },
+    { name: 'Karol G', tags: ['music','female','solo','fashion'] },
+    { name: 'Alix Earle', tags: ['beauty','fashion','female','solo','lifestyle'] },
+    { name: 'Keith Lee', tags: ['food','male','solo','tutorial'] },
+    { name: 'Mikayla Nogueira', tags: ['beauty','female','solo','tutorial','entertainment'] },
+    { name: 'Bretman Rock', tags: ['beauty','comedy','male','solo','lifestyle'] },
+    { name: 'Wisdom Kaye', tags: ['fashion','male','solo','tutorial'] },
+    { name: 'Nara Smith', tags: ['lifestyle','female','solo','fashion'] },
+    { name: 'SSSniperWolf', tags: ['gaming','entertainment','female','solo'] },
+    { name: 'KSI', tags: ['music','gaming','male','solo','entertainment'] },
+    { name: 'Ninja', tags: ['gaming','entertainment','male','solo'] },
+    { name: 'Pokimane', tags: ['gaming','lifestyle','female','solo','entertainment'] },
+    { name: 'Avani Gregg', tags: ['beauty','female','solo','tutorial','lifestyle'] },
+    { name: 'Dixie D\'Amelio', tags: ['music','lifestyle','female','solo'] },
+    { name: 'Lil Huddy', tags: ['music','lifestyle','male','solo'] },
+    { name: 'Jaden Hossler', tags: ['music','lifestyle','male','solo'] },
+    { name: 'Nessa Barrett', tags: ['music','lifestyle','female','solo'] },
+    { name: 'Madi Monroe', tags: ['lifestyle','beauty','female','solo'] },
+    { name: 'Sienna Mae', tags: ['dance','comedy','female','solo'] },
+    { name: 'Tyler the Creator', tags: ['music','entertainment','male','solo'] },
+    { name: 'Gordon Ramsay', tags: ['food','male','solo','entertainment'] },
+    { name: 'Shakira', tags: ['music','dance','female','solo'] },
+    { name: 'Lele Pons', tags: ['comedy','female','solo','entertainment'] },
+    { name: 'Hannah Stocking', tags: ['comedy','female','solo','entertainment'] },
+    { name: 'Rudy Mancuso', tags: ['comedy','music','male','solo'] },
+    { name: 'Anwar Jibawi', tags: ['comedy','male','solo'] },
+    { name: 'King Bach', tags: ['comedy','male','solo'] },
+    { name: 'DeStorm Power', tags: ['music','comedy','male','solo'] },
+    { name: 'TinaKitten', tags: ['gaming','female','solo'] },
+    { name: 'Valkyrae', tags: ['gaming','female','solo','entertainment'] },
+    { name: 'Sykkuno', tags: ['gaming','male','solo','entertainment'] },
+    { name: 'Corpse Husband', tags: ['gaming','male','solo','music'] },
+    { name: 'Dream', tags: ['gaming','male','solo','music'] },
+    { name: 'GeorgeNotFound', tags: ['gaming','male','solo','comedy','entertainment'] },
+    { name: 'Sapnap', tags: ['gaming','male','solo','entertainment'] },
+    { name: 'Karl Jacobs', tags: ['gaming','male','solo','entertainment'] },
+    { name: 'Tubbo', tags: ['gaming','male','solo','comedy','entertainment'] },
+    { name: 'TommyInnit', tags: ['gaming','male','solo','comedy'] },
+    { name: 'JackManifold', tags: ['gaming','male','solo','comedy','entertainment'] },
+    { name: 'Ranboo', tags: ['gaming','male','solo'] },
+    { name: 'Nihachu', tags: ['gaming','female','solo'] },
+    { name: 'Aimsey', tags: ['gaming','female','solo'] },
+    { name: 'Eret', tags: ['gaming','male','solo','fashion'] },
+    { name: 'Fundy', tags: ['gaming','male','solo','comedy','entertainment'] },
+    { name: 'Wilbur Soot', tags: ['music','gaming','male','solo','entertainment'] },
+    { name: 'Technoblade', tags: ['gaming','male','solo'] },
+    { name: 'Ph1LzA', tags: ['gaming','male','solo'] },
+    { name: 'Skeppy', tags: ['gaming','male','solo','comedy'] },
+    { name: 'BadBoyHalo', tags: ['gaming','male','solo'] },
+    { name: 'Quackity', tags: ['gaming','male','solo','comedy','entertainment'] },
+    { name: 'Pokemon', tags: ['gaming','entertainment','male','solo'] },
+    { name: 'Fooster', tags: ['gaming','male','solo','comedy'] },
+    { name: 'Noelgoescrazy', tags: ['comedy','male','solo'] },
+    { name: 'BigChungus', tags: ['comedy','male','solo','gaming','entertainment'] },
+    { name: 'Brooke Monk', tags: ['dance','female','solo'] },
+    { name: 'Tuzelity', tags: ['comedy','male','solo'] },
+    { name: 'HOMA', tags: ['comedy','male','solo'] },
+    { name: 'Katteyes', tags: ['beauty','female','solo'] },
+    { name: 'omari.to', tags: ['comedy','male','solo'] },
+    { name: 'Baked by Melissa', tags: ['food','female','solo'] },
+    { name: 'Chef Reactions', tags: ['food','reaction','male','solo'] },
+    { name: 'The Food Freak', tags: ['food','male','solo'] },
+    { name: 'Zach Choi', tags: ['food','male','solo'] },
+    { name: 'QCP', tags: ['food','male','solo'] },
+    { name: 'Nick DiGiovanni', tags: ['food','male','solo'] },
+    { name: 'Grilled Cheese', tags: ['food','male','solo'] },
+    { name: 'That Girl', tags: ['lifestyle','female','solo'] },
+    { name: 'Elsa Majimbo', tags: ['comedy','female','solo'] },
+    { name: 'Tabitha Brown', tags: ['lifestyle','food','female','solo'] },
+    { name: 'Dr. Leslie', tags: ['lifestyle','female','solo'] },
+    { name: 'Dylan Mulvaney', tags: ['lifestyle','female','solo'] },
+    { name: 'Chris Olsen', tags: ['lifestyle','male','solo'] },
+    { name: 'Sofia Franklyn', tags: ['lifestyle','female','solo'] },
+    { name: 'Kelsey Kreppel', tags: ['lifestyle','female','solo'] },
+    { name: 'Megan Batoon', tags: ['lifestyle','female','solo'] },
+    { name: 'Tana Mongeau', tags: ['lifestyle','female','solo'] },
+    { name: 'Jeffrey Marsh', tags: ['lifestyle','male','solo'] },
+    { name: 'Mona', tags: ['dance','female','solo'] }
+  ],
+  travel: [
+    { name: 'Bangkok', tags: ['asia','city','culture','food','nightlife','shopping'] },
+    { name: 'Hong Kong', tags: ['asia','city','shopping','food','landmarks'] },
+    { name: 'London', tags: ['europe','city','culture','history','landmarks','shopping'] },
+    { name: 'Macau', tags: ['asia','city','gambling','shopping','food','history'] },
+    { name: 'Istanbul', tags: ['europe','asia','city','history','culture','food'] },
+    { name: 'Dubai', tags: ['middle-east','city','luxury','shopping','landmarks'] },
+    { name: 'Mecca', tags: ['middle-east','city','pilgrimage','history'] },
+    { name: 'Antalya', tags: ['europe','beach','city','history','luxury'] },
+    { name: 'Paris', tags: ['europe','city','culture','romance','landmarks','food'] },
+    { name: 'Kuala Lumpur', tags: ['asia','city','shopping','food','landmarks','culture'] },
+    { name: 'New York', tags: ['americas','city','culture','shopping','landmarks','nightlife'] },
+    { name: 'Tokyo', tags: ['asia','city','culture','food','shopping','landmarks'] },
+    { name: 'Singapore', tags: ['asia','city','food','shopping','technology'] },
+    { name: 'Barcelona', tags: ['europe','city','beach','culture','nightlife','food'] },
+    { name: 'Rome', tags: ['europe','city','history','culture','food','landmarks'] },
+    { name: 'Milan', tags: ['europe','city','fashion','shopping','culture','history'] },
+    { name: 'Amsterdam', tags: ['europe','city','culture','nightlife','landmarks','history'] },
+    { name: 'Vienna', tags: ['europe','city','culture','history','architecture','food'] },
+    { name: 'Prague', tags: ['europe','city','history','culture','architecture','nightlife'] },
+    { name: 'Seoul', tags: ['asia','city','culture','food','shopping','nightlife'] },
+    { name: 'Mumbai', tags: ['asia','city','culture','food','shopping','history'] },
+    { name: 'Delhi', tags: ['asia','city','history','culture','food'] },
+    { name: 'Jaipur', tags: ['asia','city','history','culture','architecture'] },
+    { name: 'Shanghai', tags: ['asia','city','shopping','food','technology','landmarks'] },
+    { name: 'Beijing', tags: ['asia','city','history','culture','landmarks','food'] },
+    { name: 'Guangzhou', tags: ['asia','city','shopping','food','culture'] },
+    { name: 'Shenzhen', tags: ['asia','city','technology','shopping'] },
+    { name: 'Taipei', tags: ['asia','city','food','nightlife','culture'] },
+    { name: 'Osaka', tags: ['asia','city','food','culture','shopping','nightlife'] },
+    { name: 'Kyoto', tags: ['asia','city','culture','history','temples','scenery'] },
+    { name: 'Grand Canyon', tags: ['americas','nature','adventure','landmarks','scenery'] },
+    { name: 'Banff', tags: ['americas','nature','adventure','scenery','skiing'] },
+    { name: 'Norwegian Fjords', tags: ['europe','nature','scenery','adventure'] },
+    { name: 'Costa Rica', tags: ['americas','nature','adventure','wildlife','beach'] },
+    { name: 'Bali', tags: ['asia','beach','culture','nature','tropical'] },
+    { name: 'Maldives', tags: ['asia','beach','luxury','tropical','island'] },
+    { name: 'Salar de Uyuni', tags: ['americas','nature','adventure','landmarks','scenery'] },
+    { name: 'Iguazu Falls', tags: ['americas','nature','adventure','landmarks','scenery'] },
+    { name: 'Galapagos Islands', tags: ['americas','nature','adventure','wildlife','island'] },
+    { name: 'Amazon Rainforest', tags: ['americas','nature','adventure','wildlife'] },
+    { name: 'Patagonia', tags: ['americas','nature','adventure','scenery','skiing'] },
+    { name: 'Sahara Desert', tags: ['africa','nature','adventure','scenery'] },
+    { name: 'Victoria Falls', tags: ['africa','nature','adventure','landmarks','scenery'] },
+    { name: 'Serengeti', tags: ['africa','nature','adventure','wildlife','safari'] },
+    { name: 'Mount Kilimanjaro', tags: ['africa','nature','adventure','scenery','skiing'] },
+    { name: 'Great Barrier Reef', tags: ['oceania','nature','adventure','beach','island'] },
+    { name: 'Uluru', tags: ['oceania','nature','adventure','landmarks','scenery','culture'] },
+    { name: 'Milford Sound', tags: ['oceania','nature','scenery','adventure'] },
+    { name: 'Ha Long Bay', tags: ['asia','nature','scenery','adventure'] },
+    { name: 'Zhangjiajie', tags: ['asia','nature','scenery','landmarks','adventure'] },
+    { name: 'Mount Fuji', tags: ['asia','nature','scenery','landmarks'] },
+    { name: 'Cherry Blossom Japan', tags: ['asia','nature','scenery','culture'] },
+    { name: 'Cancun', tags: ['americas','beach','tropical','luxury'] },
+    { name: 'Phuket', tags: ['asia','beach','tropical','nightlife','island'] },
+    { name: 'Bora Bora', tags: ['oceania','beach','tropical','luxury','island'] },
+    { name: 'Zanzibar', tags: ['africa','beach','tropical','culture','island'] },
+    { name: 'Santorini', tags: ['europe','island','romance','beach','scenery','landmarks'] },
+    { name: 'Maui', tags: ['oceania','beach','nature','tropical','island'] },
+    { name: 'Fiji', tags: ['oceania','beach','tropical','luxury','island'] },
+    { name: 'Seychelles', tags: ['africa','beach','tropical','luxury','island'] },
+    { name: 'Mauritius', tags: ['africa','beach','tropical','luxury','island'] },
+    { name: 'Bahamas', tags: ['americas','beach','tropical','island','luxury'] },
+    { name: 'Tulum', tags: ['americas','beach','history','tropical','culture'] },
+    { name: 'Mykonos', tags: ['europe','island','beach','nightlife','culture'] },
+    { name: 'Ibiza', tags: ['europe','island','beach','nightlife','party'] },
+    { name: 'Cabo San Lucas', tags: ['americas','beach','luxury','nightlife'] },
+    { name: 'Aruba', tags: ['americas','beach','tropical','island','luxury'] },
+    { name: 'Barbados', tags: ['americas','beach','tropical','island','culture'] },
+    { name: 'Jamaica', tags: ['americas','beach','tropical','island','culture','food'] },
+    { name: 'Koh Samui', tags: ['asia','beach','tropical','island','luxury'] },
+    { name: 'Krabi', tags: ['asia','beach','tropical','nature','adventure'] },
+    { name: 'Riviera Maya', tags: ['americas','beach','tropical','luxury','history'] },
+    { name: 'Machu Picchu', tags: ['americas','history','adventure','nature','culture','landmarks'] },
+    { name: 'Petra', tags: ['asia','history','culture','landmarks','adventure'] },
+    { name: 'Cusco', tags: ['americas','history','culture','adventure','city'] },
+    { name: 'Egypt Luxor', tags: ['africa','history','culture','landmarks','adventure'] },
+    { name: 'Cairo', tags: ['africa','city','history','culture','landmarks'] },
+    { name: 'Marrakech', tags: ['africa','city','culture','history','architecture'] },
+    { name: 'Fes', tags: ['africa','city','culture','history','architecture'] },
+    { name: 'Angkor Wat', tags: ['asia','history','culture','landmarks','adventure'] },
+    { name: 'Hanoi', tags: ['asia','city','culture','food','history'] },
+    { name: 'Hoi An', tags: ['asia','city','culture','history','food'] },
+    { name: 'Bagan', tags: ['asia','history','culture','landmarks','adventure'] },
+    { name: 'Teotihuacan', tags: ['americas','history','culture','landmarks','adventure'] },
+    { name: 'Chichen Itza', tags: ['americas','history','culture','landmarks'] },
+    { name: 'Athens', tags: ['europe','city','history','culture','landmarks','food'] },
+    { name: 'Cappadocia', tags: ['asia','nature','adventure','landmarks','romance'] },
+    { name: 'Dubrovnik', tags: ['europe','city','history','culture','beach','scenery'] },
+    { name: 'Budapest', tags: ['europe','city','history','culture','nightlife','food'] },
+    { name: 'Krakow', tags: ['europe','city','history','culture','architecture'] },
+    { name: 'St. Petersburg', tags: ['europe','city','history','culture','architecture'] },
+    { name: 'Moscow', tags: ['europe','city','history','culture','architecture','landmarks'] },
+    { name: 'Lisbon', tags: ['europe','city','culture','food','beach','history'] },
+    { name: 'Porto', tags: ['europe','city','culture','food','history'] },
+    { name: 'Madrid', tags: ['europe','city','culture','nightlife','food','art'] },
+    { name: 'Florence', tags: ['europe','city','history','culture','food','art'] },
+    { name: 'Venice', tags: ['europe','city','history','romance','culture','landmarks'] },
+    { name: 'Sydney', tags: ['oceania','city','beach','nature','landmarks','scenery'] },
+    { name: 'Melbourne', tags: ['oceania','city','culture','food','sports'] },
+    { name: 'Queenstown', tags: ['oceania','adventure','nature','scenery','sports'] },
+    { name: 'Cape Town', tags: ['africa','city','nature','beach','adventure','scenery'] },
+    { name: 'Rio de Janeiro', tags: ['americas','city','beach','culture','nightlife','landmarks'] },
+    { name: 'Buenos Aires', tags: ['americas','city','culture','food','nightlife','architecture'] },
+    { name: 'Lima', tags: ['americas','city','culture','food','history'] },
+    { name: 'Santiago', tags: ['americas','city','culture','food','nature'] },
+    { name: 'Bogota', tags: ['americas','city','culture','food','nightlife'] },
+    { name: 'Mexico City', tags: ['americas','city','culture','food','history','nightlife'] },
+    { name: 'San Francisco', tags: ['americas','city','culture','food','landmarks'] },
+    { name: 'Los Angeles', tags: ['americas','city','entertainment','beach','shopping'] },
+    { name: 'Las Vegas', tags: ['americas','city','nightlife','shopping','luxury'] },
+    { name: 'Miami', tags: ['americas','city','beach','nightlife','culture'] },
+    { name: 'Chicago', tags: ['americas','city','architecture','food','culture'] },
+    { name: 'Toronto', tags: ['americas','city','culture','food','multicultural'] },
+    { name: 'Vancouver', tags: ['americas','city','nature','adventure','scenery'] },
+    { name: 'Reykjavik', tags: ['europe','city','nature','adventure','scenery'] },
+    { name: 'Dublin', tags: ['europe','city','culture','nightlife','history'] },
+    { name: 'Edinburgh', tags: ['europe','city','history','culture','architecture'] },
+    { name: 'Zurich', tags: ['europe','city','luxury','shopping','scenery'] },
+    { name: 'Geneva', tags: ['europe','city','luxury','scenery','food'] },
+    { name: 'Stockholm', tags: ['europe','city','culture','history','food','scenery'] },
+    { name: 'Copenhagen', tags: ['europe','city','culture','food','design','nightlife'] },
+    { name: 'Oslo', tags: ['europe','city','nature','scenery','culture'] },
+    { name: 'Berlin', tags: ['europe','city','culture','history','nightlife','food'] },
+    { name: 'Munich', tags: ['europe','city','culture','food','history','festival'] },
+    { name: 'Hamburg', tags: ['europe','city','culture','nightlife','food'] },
+    { name: 'Warsaw', tags: ['europe','city','history','culture','food'] },
+    { name: 'Tallinn', tags: ['europe','city','history','culture','architecture'] },
+    { name: 'Helsinki', tags: ['europe','city','culture','nature','design'] },
+    { name: 'Riga', tags: ['europe','city','history','architecture','culture'] },
+    { name: 'Vilnius', tags: ['europe','city','history','architecture','culture'] },
+    { name: 'Pattaya', tags: ['asia','city','beach','nightlife'] },
+    { name: 'Chiang Mai', tags: ['asia','city','culture','nature','food','adventure'] },
+    { name: 'Manila', tags: ['asia','city','culture','food','nightlife'] },
+    { name: 'Cebu', tags: ['asia','city','beach','nature','island'] },
+    { name: 'Ho Chi Minh City', tags: ['asia','city','culture','food','history'] },
+    { name: 'Jakarta', tags: ['asia','city','food','shopping','culture'] },
+    { name: 'Colombo', tags: ['asia','city','culture','food','history'] },
+    { name: 'Kolkata', tags: ['asia','city','culture','history','food'] },
+    { name: 'Chennai', tags: ['asia','city','culture','food','history'] },
+    { name: 'Bangalore', tags: ['asia','city','technology','food','culture'] },
+    { name: 'Hyderabad', tags: ['asia','city','history','culture','food'] },
+    { name: 'Kathmandu', tags: ['asia','city','culture','history','adventure','nature'] },
+    { name: 'Pokhara', tags: ['asia','nature','adventure','scenery'] },
+    { name: 'Cuba Havana', tags: ['americas','city','culture','history','beach','music'] },
+    { name: 'Cartagena', tags: ['americas','city','history','culture','beach','nightlife'] },
+    { name: 'Rapa Nui', tags: ['americas','island','history','culture','nature'] },
+    { name: 'Panama City', tags: ['americas','city','culture','shopping','history'] },
+    { name: 'San Jose', tags: ['americas','city','nature','adventure'] },
+    { name: 'Montego Bay', tags: ['americas','beach','tropical','island','luxury'] },
+    { name: 'Nassau', tags: ['americas','beach','tropical','island','luxury'] },
+    { name: 'San Juan', tags: ['americas','city','beach','history','culture'] },
+    { name: 'Bruges', tags: ['europe','city','history','romance','architecture'] },
+    { name: 'Nice', tags: ['europe','city','beach','luxury','culture','food'] },
+    { name: 'Monaco', tags: ['europe','city','luxury','nightlife','racing'] }
+  ],
+  music: [
+    { name: 'Taylor Swift', tags: ['pop','female','solo','american','global-hit','dance'] },
+    { name: 'Sabrina Carpenter', tags: ['pop','female','solo','american','dance'] },
+    { name: 'Billie Eilish', tags: ['pop','alternative','female','solo','american'] },
+    { name: 'Ariana Grande', tags: ['pop','r&b','female','solo','american','dance'] },
+    { name: 'Chappell Roan', tags: ['pop','indie','female','solo','american'] },
+    { name: 'Dua Lipa', tags: ['pop','dance','female','solo','british'] },
+    { name: 'Olivia Rodrigo', tags: ['pop','rock','female','solo','american','alternative'] },
+    { name: 'SZA', tags: ['r&b','pop','female','solo','american','soul'] },
+    { name: 'Doja Cat', tags: ['pop','hip-hop','female','solo','american','dance'] },
+    { name: 'The Weeknd', tags: ['pop','r&b','male','solo','global-hit'] },
+    { name: 'Bruno Mars', tags: ['pop','r&b','male','solo','dance'] },
+    { name: 'Lady Gaga', tags: ['pop','dance','electronic','female','solo','american'] },
+    { name: 'Harry Styles', tags: ['pop','rock','male','solo','british'] },
+    { name: 'Ed Sheeran', tags: ['pop','folk','male','solo','british'] },
+    { name: 'Kendrick Lamar', tags: ['hip-hop','male','solo','american','alternative'] },
+    { name: 'Drake', tags: ['hip-hop','pop','male','solo','global-hit'] },
+    { name: 'Travis Scott', tags: ['hip-hop','male','solo','electronic'] },
+    { name: 'J. Cole', tags: ['hip-hop','male','solo','american'] },
+    { name: '21 Savage', tags: ['hip-hop','male','solo','british'] },
+    { name: 'Tyler the Creator', tags: ['hip-hop','alternative','male','solo','american','pop'] },
+    { name: 'Jack Harlow', tags: ['hip-hop','pop','male','solo','american','dance'] },
+    { name: 'Morgan Wallen', tags: ['country','male','solo','american','pop'] },
+    { name: 'Zach Bryan', tags: ['country','folk','male','solo','american'] },
+    { name: 'Luke Combs', tags: ['country','male','solo','american','rock'] },
+    { name: 'Chris Stapleton', tags: ['country','rock','male','solo','american','soul'] },
+    { name: 'Bad Bunny', tags: ['latin','male','solo','reggaeton','global-hit'] },
+    { name: 'Karol G', tags: ['latin','pop','female','solo','reggaeton'] },
+    { name: 'Peso Pluma', tags: ['latin','male','solo','mexican'] },
+    { name: 'Shakira', tags: ['latin','pop','female','solo','dance','global-hit'] },
+    { name: 'Rauw Alejandro', tags: ['latin','reggaeton','male','solo','dance'] },
+    { name: 'BTS', tags: ['k-pop','pop','hip-hop','group','global-hit','dance'] },
+    { name: 'BLACKPINK', tags: ['k-pop','hip-hop','group','global-hit','dance'] },
+    { name: 'Stray Kids', tags: ['k-pop','hip-hop','group','korean','dance'] },
+    { name: 'NewJeans', tags: ['k-pop','pop','r&b','group','korean'] },
+    { name: 'Imagine Dragons', tags: ['rock','alternative','group','american','global-hit'] },
+    { name: 'Coldplay', tags: ['rock','alternative','group','british','global-hit'] },
+    { name: 'Linkin Park', tags: ['rock','alternative','group','american'] },
+    { name: 'Hozier', tags: ['indie','folk','rock','male','solo','irish'] },
+    { name: 'Noah Kahan', tags: ['folk','indie','pop','male','solo','american'] },
+    { name: 'Miley Cyrus', tags: ['pop','rock','female','solo','american','dance'] },
+    { name: 'Lana Del Rey', tags: ['indie','pop','alternative','female','solo','american'] },
+    { name: 'Post Malone', tags: ['pop','hip-hop','rock','male','solo','american'] },
+    { name: 'Eminem', tags: ['hip-hop','male','solo','american'] },
+    { name: 'Beyonce', tags: ['pop','r&b','female','solo','american','dance'] },
+    { name: 'Adele', tags: ['pop','soul','female','solo','british'] },
+    { name: 'Rihanna', tags: ['pop','r&b','female','solo','global-hit','dance'] },
+    { name: 'Metro Boomin', tags: ['hip-hop','male','solo','american','electronic'] },
+    { name: 'Frank Ocean', tags: ['r&b','alternative','male','solo','american'] },
+    { name: 'Kacey Musgraves', tags: ['country','pop','female','solo','american'] },
+    { name: 'Fleetwood Mac', tags: ['rock','pop','group','american'] },
+    { name: 'Justin Bieber', tags: ['pop','r&b','male','solo','global-hit','dance'] },
+    { name: 'Pitbull', tags: ['pop','dance','latin','male','solo'] },
+    { name: 'David Guetta', tags: ['electronic','dance','male','solo','french','global-hit'] },
+    { name: 'Calvin Harris', tags: ['electronic','dance','male','solo','global-hit'] },
+    { name: 'Katy Perry', tags: ['pop','female','solo','american','dance'] },
+    { name: 'Sia', tags: ['pop','alternative','female','solo','australian'] },
+    { name: 'Zara Larsson', tags: ['pop','dance','female','solo','swedish'] },
+    { name: 'Chris Brown', tags: ['r&b','hip-hop','male','solo','american','dance'] },
+    { name: 'Maroon 5', tags: ['pop','rock','group','american','global-hit'] },
+    { name: 'Black Eyed Peas', tags: ['hip-hop','pop','dance','group','american'] },
+    { name: 'Sean Paul', tags: ['dance','reggae','male','solo','jamaican'] },
+    { name: 'Arctic Monkeys', tags: ['rock','indie','alternative','group','british'] },
+    { name: 'Future', tags: ['hip-hop','male','solo','american','trap'] },
+    { name: 'Halsey', tags: ['pop','alternative','female','solo','american'] },
+    { name: 'Sam Smith', tags: ['pop','soul','r&b','male','solo','british'] },
+    { name: 'Queen', tags: ['rock','group','british','global-hit'] },
+    { name: 'Daddy Yankee', tags: ['latin','reggaeton','male','solo','global-hit'] },
+    { name: 'Luis Fonsi', tags: ['latin','pop','male','solo','global-hit'] },
+    { name: 'J Balvin', tags: ['latin','reggaeton','male','solo','global-hit'] },
+    { name: 'Ozuna', tags: ['latin','reggaeton','male','solo'] },
+    { name: 'Anuel AA', tags: ['latin','trap','male','solo'] },
+    { name: 'Nicky Jam', tags: ['latin','reggaeton','male','solo'] },
+    { name: 'Maluma', tags: ['latin','pop','male','solo'] },
+    { name: 'Rosalia', tags: ['latin','pop','alternative','female','solo','spanish'] },
+    { name: 'Becky G', tags: ['latin','pop','dance','female','solo','american'] },
+    { name: 'Natti Natasha', tags: ['latin','pop','female','solo'] },
+    { name: 'Anitta', tags: ['latin','pop','female','solo','brazilian'] },
+    { name: 'Maneskin', tags: ['rock','pop','group','italian','global-hit'] },
+    { name: 'Glass Animals', tags: ['indie','alternative','rock','group','british'] },
+    { name: 'Tame Impala', tags: ['indie','psychedelic','rock','male','solo','australian'] },
+    { name: 'Mac Miller', tags: ['hip-hop','r&b','male','solo','american'] },
+    { name: 'Juice WRLD', tags: ['hip-hop','pop','male','solo','american'] },
+    { name: 'XXXTentacion', tags: ['hip-hop','alternative','male','solo','american'] },
+    { name: 'Lil Nas X', tags: ['pop','hip-hop','male','solo','american'] },
+    { name: 'Lil Baby', tags: ['hip-hop','male','solo','american'] },
+    { name: 'DaBaby', tags: ['hip-hop','male','solo','american'] },
+    { name: 'Megan Thee Stallion', tags: ['hip-hop','female','solo','american'] },
+    { name: 'Cardi B', tags: ['hip-hop','pop','female','solo','american'] },
+    { name: 'Nicki Minaj', tags: ['hip-hop','pop','female','solo','global-hit'] },
+    { name: 'Lizzo', tags: ['pop','hip-hop','female','solo','american'] },
+    { name: 'Janelle Monae', tags: ['pop','r&b','alternative','female','solo','american'] },
+    { name: 'Anderson Paak', tags: ['r&b','hip-hop','soul','male','solo','american'] },
+    { name: 'Daniel Caesar', tags: ['r&b','soul','male','solo','canadian'] },
+    { name: 'Giveon', tags: ['r&b','soul','male','solo','american'] },
+    { name: 'H.E.R.', tags: ['r&b','soul','female','solo','american'] },
+    { name: 'Jorja Smith', tags: ['r&b','soul','female','solo','british'] },
+    { name: 'Ella Mai', tags: ['r&b','soul','female','solo','british'] },
+    { name: 'Summer Walker', tags: ['r&b','soul','female','solo','american'] },
+    { name: 'Alicia Keys', tags: ['r&b','soul','pop','female','solo','american'] },
+    { name: 'John Legend', tags: ['r&b','soul','pop','male','solo','american'] },
+    { name: 'Steve Lacy', tags: ['r&b','indie','alternative','male','solo','american'] },
+    { name: 'Khalid', tags: ['r&b','pop','male','solo','american'] },
+    { name: 'The Kid LAROI', tags: ['pop','hip-hop','male','solo','australian'] },
+    { name: 'Gracie Abrams', tags: ['pop','indie','female','solo','american'] },
+    { name: 'Phoebe Bridgers', tags: ['indie','rock','alternative','female','solo','american'] },
+    { name: 'Boygenius', tags: ['indie','rock','alternative','group','american'] },
+    { name: 'Mitski', tags: ['indie','rock','alternative','female','solo','american'] },
+    { name: 'Japanese Breakfast', tags: ['indie','pop','alternative','female','solo','american'] },
+    { name: 'Clairo', tags: ['indie','pop','female','solo','american'] },
+    { name: 'Rex Orange County', tags: ['indie','pop','r&b','male','solo','british'] },
+    { name: 'Brent Faiyaz', tags: ['r&b','soul','male','solo','american'] },
+    { name: 'Snoh Aalegra', tags: ['r&b','soul','female','solo','swedish'] },
+    { name: 'Jhen Aiko', tags: ['r&b','soul','female','solo','american'] },
+    { name: 'Teyana Taylor', tags: ['r&b','hip-hop','female','solo','american'] },
+    { name: 'Ari Lennox', tags: ['r&b','soul','female','solo','american'] },
+    { name: 'Lucky Daye', tags: ['r&b','soul','male','solo','american'] },
+    { name: 'Leon Bridges', tags: ['soul','r&b','pop','male','solo','american'] },
+    { name: 'Maggie Rogers', tags: ['folk','pop','indie','female','solo','american'] },
+    { name: 'Vampire Weekend', tags: ['indie','rock','alternative','group','american'] },
+    { name: 'Foster the People', tags: ['indie','pop','rock','group','american'] },
+    { name: 'Mumford and Sons', tags: ['folk','rock','indie','group','british'] },
+    { name: 'The Lumineers', tags: ['folk','rock','indie','group','american'] },
+    { name: 'Bon Iver', tags: ['indie','folk','alternative','male','solo','american'] },
+    { name: 'Stromae', tags: ['electronic','pop','male','solo','french','alternative'] },
+    { name: 'Daft Punk', tags: ['electronic','dance','house','group','french','global-hit'] },
+    { name: 'Marshmello', tags: ['electronic','dance','pop','male','solo','american'] },
+    { name: 'Avicii', tags: ['electronic','dance','pop','male','solo','swedish'] },
+    { name: 'Kygo', tags: ['electronic','dance','pop','male','solo','norwegian'] },
+    { name: 'Diplo', tags: ['electronic','dance','pop','male','solo','american'] },
+    { name: 'Major Lazer', tags: ['electronic','dance','reggae','group','american'] },
+    { name: 'Skrillex', tags: ['electronic','dubstep','male','solo','american'] },
+    { name: 'Martin Garrix', tags: ['electronic','dance','pop','male','solo','dutch'] },
+    { name: 'Tiësto', tags: ['electronic','dance','trance','male','solo','dutch'] },
+    { name: 'Swedish House Mafia', tags: ['electronic','dance','house','group','swedish'] },
+    { name: 'Alesso', tags: ['electronic','dance','pop','male','solo','swedish'] },
+    { name: 'DJ Snake', tags: ['electronic','dance','pop','male','solo','french'] },
+    { name: 'Zedd', tags: ['electronic','dance','pop','male','solo','german','global-hit'] },
+    { name: 'Charlie Puth', tags: ['pop','r&b','male','solo','american'] },
+    { name: 'Shawn Mendes', tags: ['pop','male','solo','canadian'] },
+    { name: 'Camila Cabello', tags: ['pop','latin','female','solo','cuban'] },
+    { name: 'Selena Gomez', tags: ['pop','female','solo','american'] },
+    { name: 'Demi Lovato', tags: ['pop','rock','female','solo','american'] },
+    { name: 'Kehlani', tags: ['r&b','pop','female','solo','american'] },
+    { name: 'Tinashe', tags: ['r&b','pop','dance','female','solo','american'] },
+    { name: 'Normani', tags: ['r&b','pop','dance','female','solo','american'] },
+    { name: 'Chloe x Halle', tags: ['r&b','pop','group','american'] },
+    { name: 'Madison Beer', tags: ['pop','r&b','female','solo','american'] },
+    { name: 'Alexander 23', tags: ['pop','indie','alternative','male','solo','american'] },
+    { name: 'Stephen Sanchez', tags: ['pop','indie','male','solo','american'] },
+    { name: 'd4vd', tags: ['pop','r&b','male','solo','american'] }
+  ],
+};
+
+// --- QUESTIONS ---
+const QUESTIONS = {
+  netflix: {
+    tier1: [
+      { tag: 'drama', texts: ['Você gosta de drama?', 'Você curte drama?', 'E se envolvesse drama... você gostaria?', 'Caso tivesse drama, te interessaria?', 'Você se interessa por drama?', 'drama é algo que te atrai?', 'Você é fã de drama?', 'Te agrada quando tem drama?', 'Você aprecia drama?', 'Conteúdo com drama te prende a atenção?', 'Você busca ativamente por drama?', 'Você costuma consumir drama?'] },
+      { tag: 'thriller', texts: ['Você gosta de suspense?', 'Você curte suspense?', 'E se envolvesse suspense... você gostaria?', 'Caso tivesse suspense, te interessaria?', 'Você se interessa por suspense?', 'suspense é algo que te atrai?', 'Você é fã de suspense?', 'Te agrada quando tem suspense?', 'Você aprecia suspense?', 'Conteúdo com suspense te prende a atenção?', 'Você busca ativamente por suspense?', 'Você costuma consumir suspense?'] },
+      { tag: 'comedy', texts: ['Você gosta de comédia?', 'Você curte comédia?', 'E se envolvesse comédia... você gostaria?', 'Caso tivesse comédia, te interessaria?', 'Você se interessa por comédia?', 'comédia é algo que te atrai?', 'Você é fã de comédia?', 'Te agrada quando tem comédia?', 'Você aprecia comédia?', 'Conteúdo com comédia te prende a atenção?', 'Você busca ativamente por comédia?', 'Você costuma consumir comédia?'] },
+      { tag: 'korean', texts: ['Gosta de produções coreanas?', 'Você curte produções coreanas?', 'E se envolvesse produções coreanas... você gostaria?', 'Caso tivesse produções coreanas, te interessaria?', 'Você se interessa por produções coreanas?', 'produções coreanas é algo que te atrai?', 'Você é fã de produções coreanas?', 'Te agrada quando tem produções coreanas?', 'Você aprecia produções coreanas?'] },
+      { tag: 'crime', texts: ['Você gosta de crime?', 'Você curte crime?', 'E se envolvesse crime... você gostaria?', 'Caso tivesse crime, te interessaria?', 'Você se interessa por crime?', 'crime é algo que te atrai?', 'Você é fã de crime?', 'Te agrada quando tem crime?', 'Você aprecia crime?', 'Conteúdo com crime te prende a atenção?', 'Você busca ativamente por crime?', 'Você costuma consumir crime?'] },
+      { tag: 'mystery', texts: ['Você gosta de mistério?', 'Você curte mistério?', 'E se envolvesse mistério... você gostaria?', 'Caso tivesse mistério, te interessaria?', 'Você se interessa por mistério?', 'mistério é algo que te atrai?', 'Você é fã de mistério?', 'Te agrada quando tem mistério?', 'Você aprecia mistério?', 'Conteúdo com mistério te prende a atenção?', 'Você busca ativamente por mistério?', 'Você costuma consumir mistério?'] },
+      { tag: 'action', texts: ['Você gosta de ação?', 'Você curte ação?', 'E se envolvesse ação... você gostaria?', 'Caso tivesse ação, te interessaria?', 'Você se interessa por ação?', 'ação é algo que te atrai?', 'Você é fã de ação?', 'Te agrada quando tem ação?', 'Você aprecia ação?', 'Conteúdo com ação te prende a atenção?', 'Você busca ativamente por ação?', 'Você costuma consumir ação?'] },
+      { tag: 'romance', texts: ['Você gosta de romance?', 'Você curte romance?', 'E se envolvesse romance... você gostaria?', 'Caso tivesse romance, te interessaria?', 'Você se interessa por romance?', 'romance é algo que te atrai?', 'Você é fã de romance?', 'Te agrada quando tem romance?', 'Você aprecia romance?', 'Conteúdo com romance te prende a atenção?', 'Você busca ativamente por romance?', 'Você costuma consumir romance?'] },
+      { tag: 'fantasy', texts: ['Você gosta de fantasia?', 'Você curte fantasia?', 'E se envolvesse fantasia... você gostaria?', 'Caso tivesse fantasia, te interessaria?', 'Você se interessa por fantasia?', 'fantasia é algo que te atrai?', 'Você é fã de fantasia?', 'Te agrada quando tem fantasia?', 'Você aprecia fantasia?', 'Conteúdo com fantasia te prende a atenção?', 'Você busca ativamente por fantasia?', 'Você costuma consumir fantasia?'] },
+      { tag: 'supernatural', texts: ['Gosta de sobrenatural?', 'Você curte sobrenatural?', 'E se envolvesse sobrenatural... você gostaria?', 'Caso tivesse sobrenatural, te interessaria?', 'Você se interessa por sobrenatural?', 'sobrenatural é algo que te atrai?', 'Você é fã de sobrenatural?', 'Te agrada quando tem sobrenatural?', 'Você aprecia sobrenatural?'] },
+    ],
+    tier2: [
+      { tag: 'adventure', texts: ['Gosta de aventura?', 'Você curte aventura?', 'E se envolvesse aventura... você gostaria?', 'Caso tivesse aventura, te interessaria?', 'Você se interessa por aventura?', 'aventura é algo que te atrai?', 'E se fosse sobre aventura?', 'Você se considera fã de aventura?', 'Você procura ativamente por aventura?'] },
+      { tag: 'horror', texts: ['Você gosta de terror?', 'Você curte terror?', 'E se envolvesse terror... você gostaria?', 'Caso tivesse terror, te interessaria?', 'Você se interessa por terror?', 'terror é algo que te atrai?', 'E se fosse sobre terror?', 'Você se considera fã de terror?', 'Você procura ativamente por terror?'] },
+      { tag: 'sci-fi', texts: ['Você gosta de ficção científica?', 'Você curte ficção científica?', 'E se envolvesse ficção científica... você gostaria?', 'Caso tivesse ficção científica, te interessaria?', 'Você se interessa por ficção científica?', 'ficção científica é algo que te atrai?', 'E se fosse sobre ficção científica?', 'Você se considera fã de ficção científica?', 'Você procura ativamente por ficção científica?'] },
+      { tag: 'survival', texts: ['Gosta de sobrevivência?', 'Você curte sobrevivência?', 'E se envolvesse sobrevivência... você gostaria?', 'Caso tivesse sobrevivência, te interessaria?', 'Você se interessa por sobrevivência?', 'sobrevivência é algo que te atrai?', 'E se fosse sobre sobrevivência?', 'Você se considera fã de sobrevivência?', 'Você procura ativamente por sobrevivência?'] },
+      { tag: 'historical', texts: ['Gosta de história e época?', 'Você curte história e época?', 'E se envolvesse história e época... você gostaria?', 'Caso tivesse história e época, te interessaria?', 'Você se interessa por história e época?', 'história e época é algo que te atrai?', 'E se fosse sobre história e época?', 'Você se considera fã de história e época?', 'Você procura ativamente por história e época?'] },
+      { tag: 'psychological', texts: ['Gosta de suspense psicológico?', 'Você curte suspense psicológico?', 'E se envolvesse suspense psicológico... você gostaria?', 'Caso tivesse suspense psicológico, te interessaria?', 'Você se interessa por suspense psicológico?', 'suspense psicológico é algo que te atrai?', 'E se fosse sobre suspense psicológico?', 'Você se considera fã de suspense psicológico?', 'Você procura ativamente por suspense psicológico?'] },
+      { tag: 'teen', texts: ['Gosta de conteúdo adolescente?', 'Você curte conteúdo adolescente?', 'E se envolvesse conteúdo adolescente... você gostaria?', 'Caso tivesse conteúdo adolescente, te interessaria?', 'Você se interessa por conteúdo adolescente?', 'conteúdo adolescente é algo que te atrai?', 'E se fosse sobre conteúdo adolescente?', 'Você se considera fã de conteúdo adolescente?', 'Você procura ativamente por conteúdo adolescente?'] },
+      { tag: 'british', texts: ['Gosta de produções britânicas?', 'Você curte produções britânicas?', 'E se envolvesse produções britânicas... você gostaria?', 'Caso tivesse produções britânicas, te interessaria?', 'Você se interessa por produções britânicas?', 'produções britânicas é algo que te atrai?', 'E se fosse sobre produções britânicas?', 'Você se considera fã de produções britânicas?', 'Você procura ativamente por produções britânicas?'] },
+      { tag: 'documentary', texts: ['Gosta de documentários?', 'Você curte documentários?', 'E se envolvesse documentários... você gostaria?', 'Caso tivesse documentários, te interessaria?', 'Você se interessa por documentários?', 'documentários é algo que te atrai?', 'E se fosse sobre documentários?', 'Você se considera fã de documentários?', 'Você procura ativamente por documentários?'] },
+    ],
+    tier3: [
+      { tag: 'family', texts: ['Gosta de conteúdo família?', 'Você curte conteúdo família?', 'E se envolvesse conteúdo família... você gostaria?', 'Caso tivesse conteúdo família, te interessaria?', 'Você se interessa por conteúdo família?', 'Você para para ver conteúdo família?', 'Você gosta de consumir conteúdo família?'] },
+      { tag: 'animation', texts: ['Gosta de animação?', 'Você curte animação?', 'E se envolvesse animação... você gostaria?', 'Caso tivesse animação, te interessaria?', 'Você se interessa por animação?', 'Você para para ver animação?', 'Você gosta de consumir animação?'] },
+      { tag: 'french', texts: ['Gosta de produções francesas?', 'Você curte produções francesas?', 'E se envolvesse produções francesas... você gostaria?', 'Caso tivesse produções francesas, te interessaria?', 'Você se interessa por produções francesas?', 'Você para para ver produções francesas?', 'Você gosta de consumir produções francesas?'] },
+      { tag: 'true-crime', texts: ['Gosta de true crime?', 'Você curte true crime?', 'E se envolvesse true crime... você gostaria?', 'Caso tivesse true crime, te interessaria?', 'Você se interessa por true crime?', 'Você para para ver true crime?', 'Você gosta de consumir true crime?'] },
+      { tag: 'spanish', texts: ['Gosta de produções espanholas?', 'Você curte produções espanholas?', 'E se envolvesse produções espanholas... você gostaria?', 'Caso tivesse produções espanholas, te interessaria?', 'Você se interessa por produções espanholas?', 'Você para para ver produções espanholas?', 'Você gosta de consumir produções espanholas?'] },
+      { tag: 'period', texts: ['Gosta de drama de época?', 'Você curte drama de época?', 'E se envolvesse drama de época... você gostaria?', 'Caso tivesse drama de época, te interessaria?', 'Você se interessa por drama de época?', 'Você para para ver drama de época?', 'Você gosta de consumir drama de época?'] },
+      { tag: 'heist', texts: ['Gosta de golpes e assaltos?', 'Você curte golpes e assaltos?', 'E se envolvesse golpes e assaltos... você gostaria?', 'Caso tivesse golpes e assaltos, te interessaria?', 'Você se interessa por golpes e assaltos?', 'Você para para ver golpes e assaltos?', 'Você gosta de consumir golpes e assaltos?'] },
+      { tag: 'anthology', texts: ['Gosta de antologia?', 'Você curte antologia?', 'E se envolvesse antologia... você gostaria?', 'Caso tivesse antologia, te interessaria?', 'Você se interessa por antologia?', 'Você para para ver antologia?', 'Você gosta de consumir antologia?'] },
+      { tag: 'zombie', texts: ['Gosta de zumbis?', 'Você curte zumbis?', 'E se envolvesse zumbis... você gostaria?', 'Caso tivesse zumbis, te interessaria?', 'Você se interessa por zumbis?', 'Você para para ver zumbis?', 'Você gosta de consumir zumbis?'] },
+    ],
+  },
+  tiktok: {
+    tier1: [
+      { tag: 'solo', texts: ['Gosta de criadores individuais?', 'Você curte criadores individuais?', 'E se envolvesse criadores individuais... você gostaria?', 'Caso tivesse criadores individuais, te interessaria?', 'Você se interessa por criadores individuais?', 'criadores individuais é algo que te atrai?', 'Você é fã de criadores individuais?', 'Te agrada quando tem criadores individuais?', 'Você aprecia criadores individuais?'] },
+      { tag: 'male', texts: ['Gosta de criadores homens?', 'Você curte criadores homens?', 'E se envolvesse criadores homens... você gostaria?', 'Caso tivesse criadores homens, te interessaria?', 'Você se interessa por criadores homens?', 'criadores homens é algo que te atrai?', 'Você é fã de criadores homens?', 'Te agrada quando tem criadores homens?', 'Você aprecia criadores homens?'] },
+      { tag: 'female', texts: ['Gosta de artistas femininas?', 'Você curte artistas femininas?', 'E se envolvesse artistas femininas... você gostaria?', 'Caso tivesse artistas femininas, te interessaria?', 'Você se interessa por artistas femininas?', 'artistas femininas é algo que te atrai?', 'Você é fã de artistas femininas?', 'Te agrada quando tem artistas femininas?', 'Você aprecia artistas femininas?'] },
+      { tag: 'entertainment', texts: ['Gosta de entretenimento?', 'Você curte entretenimento?', 'E se envolvesse entretenimento... você gostaria?', 'Caso tivesse entretenimento, te interessaria?', 'Você se interessa por entretenimento?', 'entretenimento é algo que te atrai?', 'Você é fã de entretenimento?', 'Te agrada quando tem entretenimento?', 'Você aprecia entretenimento?'] },
+      { tag: 'gaming', texts: ['Você gosta de games?', 'Você curte games?', 'E se envolvesse games... você gostaria?', 'Caso tivesse games, te interessaria?', 'Você se interessa por games?', 'games é algo que te atrai?', 'Você é fã de games?', 'Te agrada quando tem games?', 'Você aprecia games?', 'Conteúdo com games te prende a atenção?', 'Você busca ativamente por games?', 'Você costuma consumir games?'] },
+    ],
+    tier2: [
+      { tag: 'lifestyle', texts: ['Você gosta de estilo de vida?', 'Você curte estilo de vida?', 'E se envolvesse estilo de vida... você gostaria?', 'Caso tivesse estilo de vida, te interessaria?', 'Você se interessa por estilo de vida?', 'estilo de vida é algo que te atrai?', 'E se fosse sobre estilo de vida?', 'Você se considera fã de estilo de vida?', 'Você procura ativamente por estilo de vida?'] },
+      { tag: 'comedy', texts: ['Você gosta de comédia?', 'Você curte comédia?', 'E se envolvesse comédia... você gostaria?', 'Caso tivesse comédia, te interessaria?', 'Você se interessa por comédia?', 'comédia é algo que te atrai?', 'E se fosse sobre comédia?', 'Você se considera fã de comédia?', 'Você procura ativamente por comédia?'] },
+      { tag: 'music', texts: ['Você gosta de música?', 'Você curte música?', 'E se envolvesse música... você gostaria?', 'Caso tivesse música, te interessaria?', 'Você se interessa por música?', 'música é algo que te atrai?', 'E se fosse sobre música?', 'Você se considera fã de música?', 'Você procura ativamente por música?'] },
+      { tag: 'food', texts: ['Você gosta de comida e culinária?', 'Você curte comida e culinária?', 'E se envolvesse comida e culinária... você gostaria?', 'Caso tivesse comida e culinária, te interessaria?', 'Você se interessa por comida e culinária?', 'comida e culinária é algo que te atrai?', 'E se fosse sobre comida e culinária?', 'Você se considera fã de comida e culinária?', 'Você procura ativamente por comida e culinária?'] },
+    ],
+    tier3: [
+      { tag: 'dance', texts: ['Você gosta de dança?', 'Você curte dança?', 'E se envolvesse dança... você gostaria?', 'Caso tivesse dança, te interessaria?', 'Você se interessa por dança?', 'Você para para ver dança?', 'Você gosta de consumir dança?'] },
+      { tag: 'beauty', texts: ['Você gosta de beleza e makeup?', 'Você curte beleza e makeup?', 'E se envolvesse beleza e makeup... você gostaria?', 'Caso tivesse beleza e makeup, te interessaria?', 'Você se interessa por beleza e makeup?', 'Você para para ver beleza e makeup?', 'Você gosta de consumir beleza e makeup?'] },
+      { tag: 'fashion', texts: ['Você gosta de moda e estilo?', 'Você curte moda e estilo?', 'E se envolvesse moda e estilo... você gostaria?', 'Caso tivesse moda e estilo, te interessaria?', 'Você se interessa por moda e estilo?', 'Você para para ver moda e estilo?', 'Você gosta de consumir moda e estilo?'] },
+      { tag: 'tutorial', texts: ['Você gosta de tutoriais e dicas?', 'Você curte tutoriais e dicas?', 'E se envolvesse tutoriais e dicas... você gostaria?', 'Caso tivesse tutoriais e dicas, te interessaria?', 'Você se interessa por tutoriais e dicas?', 'Você para para ver tutoriais e dicas?', 'Você gosta de consumir tutoriais e dicas?'] },
+    ],
+  },
+  travel: {
+    tier1: [
+      { tag: 'city', texts: ['Gosta de grandes cidades?', 'Você curte grandes cidades?', 'E se envolvesse grandes cidades... você gostaria?', 'Caso tivesse grandes cidades, te interessaria?', 'Você se interessa por grandes cidades?', 'grandes cidades é algo que te atrai?', 'Você é fã de grandes cidades?', 'Te agrada quando tem grandes cidades?', 'Você aprecia grandes cidades?'] },
+      { tag: 'culture', texts: ['Gosta de cultura local?', 'Você curte cultura local?', 'E se envolvesse cultura local... você gostaria?', 'Caso tivesse cultura local, te interessaria?', 'Você se interessa por cultura local?', 'cultura local é algo que te atrai?', 'Você é fã de cultura local?', 'Te agrada quando tem cultura local?', 'Você aprecia cultura local?'] },
+      { tag: 'history', texts: ['Gosta de história e ruínas antigas?', 'Você curte história e ruínas antigas?', 'E se envolvesse história e ruínas antigas... você gostaria?', 'Caso tivesse história e ruínas antigas, te interessaria?', 'Você se interessa por história e ruínas antigas?', 'história e ruínas antigas é algo que te atrai?', 'Você é fã de história e ruínas antigas?', 'Te agrada quando tem história e ruínas antigas?', 'Você aprecia história e ruínas antigas?'] },
+      { tag: 'food', texts: ['Gosta de comida e culinária?', 'Você curte comida e culinária?', 'E se envolvesse comida e culinária... você gostaria?', 'Caso tivesse comida e culinária, te interessaria?', 'Você se interessa por comida e culinária?', 'comida e culinária é algo que te atrai?', 'Você é fã de comida e culinária?', 'Te agrada quando tem comida e culinária?', 'Você aprecia comida e culinária?'] },
+      { tag: 'asia', texts: ['Gosta de destinos na Ásia?', 'Você curte destinos na Ásia?', 'E se envolvesse destinos na Ásia... você gostaria?', 'Caso tivesse destinos na Ásia, te interessaria?', 'Você se interessa por destinos na Ásia?', 'destinos na Ásia é algo que te atrai?', 'Você é fã de destinos na Ásia?', 'Te agrada quando tem destinos na Ásia?', 'Você aprecia destinos na Ásia?'] },
+      { tag: 'europe', texts: ['Gosta de destinos na Europa?', 'Você curte destinos na Europa?', 'E se envolvesse destinos na Europa... você gostaria?', 'Caso tivesse destinos na Europa, te interessaria?', 'Você se interessa por destinos na Europa?', 'destinos na Europa é algo que te atrai?', 'Você é fã de destinos na Europa?', 'Te agrada quando tem destinos na Europa?', 'Você aprecia destinos na Europa?'] },
+      { tag: 'beach', texts: ['Gosta de praias paradisíacas?', 'Você curte praias paradisíacas?', 'E se envolvesse praias paradisíacas... você gostaria?', 'Caso tivesse praias paradisíacas, te interessaria?', 'Você se interessa por praias paradisíacas?', 'praias paradisíacas é algo que te atrai?', 'Você é fã de praias paradisíacas?', 'Te agrada quando tem praias paradisíacas?', 'Você aprecia praias paradisíacas?'] },
+      { tag: 'americas', texts: ['Gosta de destinos nas Américas?', 'Você curte destinos nas Américas?', 'E se envolvesse destinos nas Américas... você gostaria?', 'Caso tivesse destinos nas Américas, te interessaria?', 'Você se interessa por destinos nas Américas?', 'destinos nas Américas é algo que te atrai?', 'Você é fã de destinos nas Américas?', 'Te agrada quando tem destinos nas Américas?', 'Você aprecia destinos nas Américas?'] },
+    ],
+    tier2: [
+      { tag: 'nature', texts: ['Gosta de natureza e paisagens?', 'Você curte natureza e paisagens?', 'E se envolvesse natureza e paisagens... você gostaria?', 'Caso tivesse natureza e paisagens, te interessaria?', 'Você se interessa por natureza e paisagens?', 'natureza e paisagens é algo que te atrai?', 'E se fosse sobre natureza e paisagens?', 'Você se considera fã de natureza e paisagens?', 'Você procura ativamente por natureza e paisagens?'] },
+      { tag: 'adventure', texts: ['Gosta de aventura e trilhas?', 'Você curte aventura e trilhas?', 'E se envolvesse aventura e trilhas... você gostaria?', 'Caso tivesse aventura e trilhas, te interessaria?', 'Você se interessa por aventura e trilhas?', 'aventura e trilhas é algo que te atrai?', 'E se fosse sobre aventura e trilhas?', 'Você se considera fã de aventura e trilhas?', 'Você procura ativamente por aventura e trilhas?'] },
+      { tag: 'landmarks', texts: ['Gosta de pontos turísticos famosos?', 'Você curte pontos turísticos famosos?', 'E se envolvesse pontos turísticos famosos... você gostaria?', 'Caso tivesse pontos turísticos famosos, te interessaria?', 'Você se interessa por pontos turísticos famosos?', 'pontos turísticos famosos é algo que te atrai?', 'E se fosse sobre pontos turísticos famosos?', 'Você se considera fã de pontos turísticos famosos?', 'Você procura ativamente por pontos turísticos famosos?'] },
+      { tag: 'nightlife', texts: ['Gosta de vida noturna?', 'Você curte vida noturna?', 'E se envolvesse vida noturna... você gostaria?', 'Caso tivesse vida noturna, te interessaria?', 'Você se interessa por vida noturna?', 'vida noturna é algo que te atrai?', 'E se fosse sobre vida noturna?', 'Você se considera fã de vida noturna?', 'Você procura ativamente por vida noturna?'] },
+      { tag: 'scenery', texts: ['Gosta de paisagens deslumbrantes?', 'Você curte paisagens deslumbrantes?', 'E se envolvesse paisagens deslumbrantes... você gostaria?', 'Caso tivesse paisagens deslumbrantes, te interessaria?', 'Você se interessa por paisagens deslumbrantes?', 'paisagens deslumbrantes é algo que te atrai?', 'E se fosse sobre paisagens deslumbrantes?', 'Você se considera fã de paisagens deslumbrantes?', 'Você procura ativamente por paisagens deslumbrantes?'] },
+      { tag: 'island', texts: ['Gosta de ilhas paradisíacas?', 'Você curte ilhas paradisíacas?', 'E se envolvesse ilhas paradisíacas... você gostaria?', 'Caso tivesse ilhas paradisíacas, te interessaria?', 'Você se interessa por ilhas paradisíacas?', 'ilhas paradisíacas é algo que te atrai?', 'E se fosse sobre ilhas paradisíacas?', 'Você se considera fã de ilhas paradisíacas?', 'Você procura ativamente por ilhas paradisíacas?'] },
+      { tag: 'shopping', texts: ['Gosta de fazer compras?', 'Você curte fazer compras?', 'E se envolvesse fazer compras... você gostaria?', 'Caso tivesse fazer compras, te interessaria?', 'Você se interessa por fazer compras?', 'fazer compras é algo que te atrai?', 'E se fosse sobre fazer compras?', 'Você se considera fã de fazer compras?', 'Você procura ativamente por fazer compras?'] },
+      { tag: 'luxury', texts: ['Gosta de luxo e exclusividade?', 'Você curte luxo e exclusividade?', 'E se envolvesse luxo e exclusividade... você gostaria?', 'Caso tivesse luxo e exclusividade, te interessaria?', 'Você se interessa por luxo e exclusividade?', 'luxo e exclusividade é algo que te atrai?', 'E se fosse sobre luxo e exclusividade?', 'Você se considera fã de luxo e exclusividade?', 'Você procura ativamente por luxo e exclusividade?'] },
+    ],
+    tier3: [
+      { tag: 'tropical', texts: ['Gosta de clima tropical?', 'Você curte clima tropical?', 'E se envolvesse clima tropical... você gostaria?', 'Caso tivesse clima tropical, te interessaria?', 'Você se interessa por clima tropical?', 'Você para para ver clima tropical?', 'Você gosta de consumir clima tropical?'] },
+      { tag: 'architecture', texts: ['Gosta de arquitetura?', 'Você curte arquitetura?', 'E se envolvesse arquitetura... você gostaria?', 'Caso tivesse arquitetura, te interessaria?', 'Você se interessa por arquitetura?', 'Você para para ver arquitetura?', 'Você gosta de consumir arquitetura?'] },
+      { tag: 'africa', texts: ['Gosta de destinos na África?', 'Você curte destinos na África?', 'E se envolvesse destinos na África... você gostaria?', 'Caso tivesse destinos na África, te interessaria?', 'Você se interessa por destinos na África?', 'Você para para ver destinos na África?', 'Você gosta de consumir destinos na África?'] },
+      { tag: 'oceania', texts: ['Gosta de destinos na Oceania?', 'Você curte destinos na Oceania?', 'E se envolvesse destinos na Oceania... você gostaria?', 'Caso tivesse destinos na Oceania, te interessaria?', 'Você se interessa por destinos na Oceania?', 'Você para para ver destinos na Oceania?', 'Você gosta de consumir destinos na Oceania?'] },
+      { tag: 'romance', texts: ['Gosta de destinos românticos?', 'Você curte destinos românticos?', 'E se envolvesse destinos românticos... você gostaria?', 'Caso tivesse destinos românticos, te interessaria?', 'Você se interessa por destinos românticos?', 'Você para para ver destinos românticos?', 'Você gosta de consumir destinos românticos?'] },
+      { tag: 'technology', texts: ['Gosta de tecnologia e inovação?', 'Você curte tecnologia e inovação?', 'E se envolvesse tecnologia e inovação... você gostaria?', 'Caso tivesse tecnologia e inovação, te interessaria?', 'Você se interessa por tecnologia e inovação?', 'Você para para ver tecnologia e inovação?', 'Você gosta de consumir tecnologia e inovação?'] },
+      { tag: 'wildlife', texts: ['Gosta de vida selvagem?', 'Você curte vida selvagem?', 'E se envolvesse vida selvagem... você gostaria?', 'Caso tivesse vida selvagem, te interessaria?', 'Você se interessa por vida selvagem?', 'Você para para ver vida selvagem?', 'Você gosta de consumir vida selvagem?'] },
+      { tag: 'skiing', texts: ['Gosta de estações de esqui?', 'Você curte estações de esqui?', 'E se envolvesse estações de esqui... você gostaria?', 'Caso tivesse estações de esqui, te interessaria?', 'Você se interessa por estações de esqui?', 'Você para para ver estações de esqui?', 'Você gosta de consumir estações de esqui?'] },
+    ],
+  },
+  music: {
+    tier1: [
+      { tag: 'solo', texts: ['Gosta de artistas solo?', 'Você curte artistas solo?', 'E se envolvesse artistas solo... você gostaria?', 'Caso tivesse artistas solo, te interessaria?', 'Você se interessa por artistas solo?', 'artistas solo é algo que te atrai?', 'Você é fã de artistas solo?', 'Te agrada quando tem artistas solo?', 'Você aprecia artistas solo?', 'Conteúdo com artistas solo te prende a atenção?'] },
+      { tag: 'pop', texts: ['Você gosta de música pop?', 'Você curte música pop?', 'E se envolvesse música pop... você gostaria?', 'Caso tivesse música pop, te interessaria?', 'Você se interessa por música pop?', 'música pop é algo que te atrai?', 'Você é fã de música pop?', 'Te agrada quando tem música pop?', 'Você aprecia música pop?', 'Conteúdo com música pop te prende a atenção?', 'Você busca ativamente por música pop?', 'Você costuma consumir música pop?'] },
+      { tag: 'american', texts: ['Gosta de artistas americanos?', 'Você curte artistas americanos?', 'E se envolvesse artistas americanos... você gostaria?', 'Caso tivesse artistas americanos, te interessaria?', 'Você se interessa por artistas americanos?', 'artistas americanos é algo que te atrai?', 'Você é fã de artistas americanos?', 'Te agrada quando tem artistas americanos?', 'Você aprecia artistas americanos?'] },
+      { tag: 'male', texts: ['Gosta de artistas homens?', 'Você curte artistas homens?', 'E se envolvesse artistas homens... você gostaria?', 'Caso tivesse artistas homens, te interessaria?', 'Você se interessa por artistas homens?', 'artistas homens é algo que te atrai?', 'Você é fã de artistas homens?', 'Te agrada quando tem artistas homens?', 'Você aprecia artistas homens?'] },
+      { tag: 'female', texts: ['Gosta de artistas femininas?', 'Você curte artistas femininas?', 'E se envolvesse artistas femininas... você gostaria?', 'Caso tivesse artistas femininas, te interessaria?', 'Você se interessa por artistas femininas?', 'artistas femininas é algo que te atrai?', 'Você é fã de artistas femininas?', 'Te agrada quando tem artistas femininas?', 'Você aprecia artistas femininas?'] },
+      { tag: 'dance', texts: ['Você gosta de música para dançar?', 'Você curte música para dançar?', 'E se envolvesse música para dançar... você gostaria?', 'Caso tivesse música para dançar, te interessaria?', 'Você se interessa por música para dançar?', 'música para dançar é algo que te atrai?', 'Você é fã de música para dançar?', 'Te agrada quando tem música para dançar?', 'Você aprecia música para dançar?', 'Conteúdo com música para dançar te prende a atenção?', 'Você busca ativamente por música para dançar?', 'Você costuma consumir música para dançar?'] },
+      { tag: 'r&b', texts: ['Você gosta de R&B?', 'Você curte R&B?', 'E se envolvesse R&B... você gostaria?', 'Caso tivesse R&B, te interessaria?', 'Você se interessa por R&B?', 'R&B é algo que te atrai?', 'Você é fã de R&B?', 'Te agrada quando tem R&B?', 'Você aprecia R&B?', 'Conteúdo com R&B te prende a atenção?', 'Você busca ativamente por R&B?', 'Você costuma consumir R&B?'] },
+      { tag: 'hip-hop', texts: ['Você gosta de hip hop e rap?', 'Você curte hip hop e rap?', 'E se envolvesse hip hop e rap... você gostaria?', 'Caso tivesse hip hop e rap, te interessaria?', 'Você se interessa por hip hop e rap?', 'hip hop e rap é algo que te atrai?', 'Você é fã de hip hop e rap?', 'Te agrada quando tem hip hop e rap?', 'Você aprecia hip hop e rap?', 'Conteúdo com hip hop e rap te prende a atenção?', 'Você busca ativamente por hip hop e rap?', 'Você costuma consumir hip hop e rap?'] },
+    ],
+    tier2: [
+      { tag: 'alternative', texts: ['Você gosta de música alternativa?', 'Você curte música alternativa?', 'E se envolvesse música alternativa... você gostaria?', 'Caso tivesse música alternativa, te interessaria?', 'Você se interessa por música alternativa?', 'música alternativa é algo que te atrai?', 'E se fosse sobre música alternativa?', 'Você se considera fã de música alternativa?', 'Você procura ativamente por música alternativa?'] },
+      { tag: 'rock', texts: ['Você gosta de rock?', 'Você curte rock?', 'E se envolvesse rock... você gostaria?', 'Caso tivesse rock, te interessaria?', 'Você se interessa por rock?', 'rock é algo que te atrai?', 'E se fosse sobre rock?', 'Você se considera fã de rock?', 'Você procura ativamente por rock?'] },
+      { tag: 'indie', texts: ['Você gosta de música indie?', 'Você curte música indie?', 'E se envolvesse música indie... você gostaria?', 'Caso tivesse música indie, te interessaria?', 'Você se interessa por música indie?', 'música indie é algo que te atrai?', 'E se fosse sobre música indie?', 'Você se considera fã de música indie?', 'Você procura ativamente por música indie?'] },
+      { tag: 'group', texts: ['Gosta de grupos e bandas?', 'Você curte grupos e bandas?', 'E se envolvesse grupos e bandas... você gostaria?', 'Caso tivesse grupos e bandas, te interessaria?', 'Você se interessa por grupos e bandas?', 'grupos e bandas é algo que te atrai?', 'E se fosse sobre grupos e bandas?', 'Você se considera fã de grupos e bandas?', 'Você procura ativamente por grupos e bandas?'] },
+      { tag: 'global-hit', texts: ['Gosta de sucessos globais?', 'Você curte sucessos globais?', 'E se envolvesse sucessos globais... você gostaria?', 'Caso tivesse sucessos globais, te interessaria?', 'Você se interessa por sucessos globais?', 'sucessos globais é algo que te atrai?', 'E se fosse sobre sucessos globais?', 'Você se considera fã de sucessos globais?', 'Você procura ativamente por sucessos globais?'] },
+      { tag: 'soul', texts: ['Você gosta de música soul?', 'Você curte música soul?', 'E se envolvesse música soul... você gostaria?', 'Caso tivesse música soul, te interessaria?', 'Você se interessa por música soul?', 'música soul é algo que te atrai?', 'E se fosse sobre música soul?', 'Você se considera fã de música soul?', 'Você procura ativamente por música soul?'] },
+      { tag: 'electronic', texts: ['Você gosta de música eletrônica?', 'Você curte música eletrônica?', 'E se envolvesse música eletrônica... você gostaria?', 'Caso tivesse música eletrônica, te interessaria?', 'Você se interessa por música eletrônica?', 'música eletrônica é algo que te atrai?', 'E se fosse sobre música eletrônica?', 'Você se considera fã de música eletrônica?', 'Você procura ativamente por música eletrônica?'] },
+      { tag: 'latin', texts: ['Você gosta de música latina?', 'Você curte música latina?', 'E se envolvesse música latina... você gostaria?', 'Caso tivesse música latina, te interessaria?', 'Você se interessa por música latina?', 'música latina é algo que te atrai?', 'E se fosse sobre música latina?', 'Você se considera fã de música latina?', 'Você procura ativamente por música latina?'] },
+    ],
+    tier3: [
+      { tag: 'british', texts: ['Gosta de artistas britânicos?', 'Você curte artistas britânicos?', 'E se envolvesse artistas britânicos... você gostaria?', 'Caso tivesse artistas britânicos, te interessaria?', 'Você se interessa por artistas britânicos?', 'Você para para ver artistas britânicos?', 'Você gosta de consumir artistas britânicos?'] },
+      { tag: 'folk', texts: ['Você gosta de música folk?', 'Você curte música folk?', 'E se envolvesse música folk... você gostaria?', 'Caso tivesse música folk, te interessaria?', 'Você se interessa por música folk?', 'Você para para ver música folk?', 'Você gosta de consumir música folk?'] },
+      { tag: 'reggaeton', texts: ['Você gosta de reggaeton?', 'Você curte reggaeton?', 'E se envolvesse reggaeton... você gostaria?', 'Caso tivesse reggaeton, te interessaria?', 'Você se interessa por reggaeton?', 'Você para para ver reggaeton?', 'Você gosta de consumir reggaeton?'] },
+      { tag: 'country', texts: ['Você gosta de música country?', 'Você curte música country?', 'E se envolvesse música country... você gostaria?', 'Caso tivesse música country, te interessaria?', 'Você se interessa por música country?', 'Você para para ver música country?', 'Você gosta de consumir música country?'] },
+      { tag: 'swedish', texts: ['Gosta de artistas suecos?', 'Você curte artistas suecos?', 'E se envolvesse artistas suecos... você gostaria?', 'Caso tivesse artistas suecos, te interessaria?', 'Você se interessa por artistas suecos?', 'Você para para ver artistas suecos?', 'Você gosta de consumir artistas suecos?'] },
+      { tag: 'k-pop', texts: ['Você gosta de K-pop?', 'Você curte K-pop?', 'E se envolvesse K-pop... você gostaria?', 'Caso tivesse K-pop, te interessaria?', 'Você se interessa por K-pop?', 'Você para para ver K-pop?', 'Você gosta de consumir K-pop?'] },
+      { tag: 'french', texts: ['Gosta de artistas franceses?', 'Você curte artistas franceses?', 'E se envolvesse artistas franceses... você gostaria?', 'Caso tivesse artistas franceses, te interessaria?', 'Você se interessa por artistas franceses?', 'Você para para ver artistas franceses?', 'Você gosta de consumir artistas franceses?'] },
+      { tag: 'australian', texts: ['Gosta de artistas australianos?', 'Você curte artistas australianos?', 'E se envolvesse artistas australianos... você gostaria?', 'Caso tivesse artistas australianos, te interessaria?', 'Você se interessa por artistas australianos?', 'Você para para ver artistas australianos?', 'Você gosta de consumir artistas australianos?'] },
+    ],
+  },
+};
+
+// ============================================================
+// STATE
+// ============================================================
+const TIERS = ['tier1', 'tier2', 'tier3'];
+
+let state = {
+  category: null,
+  scores: {},
+  questionIndex: 0,
+  askedQuestions: [],
+  lastGuessedItems: [],
+  totalQuestions: 0,
+  currentQuestion: null,
+  phase: 0,
+  currentTier: 0
+};
+
+// ============================================================
+// BACKGROUND
+// ============================================================
+(function initBg() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let w, h, particles = [];
+  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  function createParticles(count) {
+    particles = [];
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * w, y: Math.random() * h,
+        size: Math.random() * 2 + 0.5,
+        speedX: (Math.random() - 0.5) * 0.25, speedY: (Math.random() - 0.5) * 0.25,
+        opacity: Math.random() * 0.4 + 0.1, hue: 240 + Math.random() * 60
+      });
+    }
+  }
+  function draw() {
+    ctx.clearRect(0, 0, w, h);
+    for (const p of particles) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${p.hue}, 70%, 60%, ${p.opacity})`;
+      ctx.fill();
+      p.x += p.speedX; p.y += p.speedY;
+      if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+      if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+    }
+    requestAnimationFrame(draw);
+  }
+  resize();
+  createParticles(80);
+  draw();
+  window.addEventListener('resize', () => { resize(); createParticles(80); });
+})();
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) { el.classList.add('active'); el.style.animation = 'none'; void el.offsetHeight; el.style.animation = ''; }
+}
+function $id(id) { return document.getElementById(id); }
+function showToast(msg, duration) {
+  const t = $id('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => { t.style.display = 'none'; }, duration || 2500);
+}
+
+// ============================================================
+// BIG DATA ANALYTICS ENGINE
+// ============================================================
+
+const TICKER_MESSAGES = {
+  netflix: [
+    '▶ Consultando catálogo Netflix — 5.481 títulos indexados',
+    '▶ Analisando padrões de audiência global — 190 países',
+    '▶ Cruzando dados de metadados e tags — 42 categorias',
+    '▶ Processando matriz de similaridade entre títulos',
+    '▶ Aplicando filtro colaborativo baseado em conteúdo',
+    '▶ Servidor srv-03.gru: 12 ms de latência',
+    '▶ Consulta distribuída — 4 nós ativos',
+    '▶ Analisando correlações de gênero e subgênero',
+    '▶ 2.3 TB de dados de streaming processados',
+    '▶ Comparando padrões com base de conhecimento'
+  ],
+  tiktok: [
+    '▶ Indexando criadores TikTok — 2.1M contas analisadas',
+    '▶ Processando métricas de engajamento por conteúdo',
+    '▶ Analisando trends virais — últimas 72 horas',
+    '▶ Cruzando dados de hashtags e categorias',
+    '▶ Mapeando rede de influenciadores e tendências',
+    '▶ Servidor srv-02.sfo: 8 ms de latência',
+    '▶ 850 GB de dados de vídeos processados',
+    '▶ Analisando padrões de compartilhamento viral',
+    '▶ Consultando banco de trends por região',
+    '▶ Processando matriz de engajamento por nicho'
+  ],
+  travel: [
+    '▶ Consultando banco de dados geoespaciais — 195 países',
+    '▶ Analisando rotas turísticas e destinos populares',
+    '▶ Cruzando dados de clima, cultura e infraestrutura',
+    '▶ Processando avaliações de viajantes — 12M reviews',
+    '▶ Mapeando correlações entre atrações turísticas',
+    '▶ Servidor srv-04.lon: 15 ms de latência',
+    '▶ 3.1 TB de dados de turismo processados',
+    '▶ Analisando sazonalidade por destino',
+    '▶ Comparando indicadores de custo-benefício',
+    '▶ Matriz de similaridade entre destinos carregada'
+  ],
+  music: [
+    '▶ Indexando biblioteca musical — 75M faixas catalogadas',
+    '▶ Analisando padrões de gênero e subgênero musical',
+    '▶ Cruzando dados de artistas, álbuns e charts globais',
+    '▶ Processando métricas de streaming por região',
+    '▶ Aplicando análise de similaridade acústica',
+    '▶ Servidor srv-01.nyc: 10 ms de latência',
+    '▶ 4.7 TB de dados de áudio processados',
+    '▶ Analisando correlações entre artistas e influências',
+    '▶ Consultando base Billboard e charts mundiais',
+    '▶ Matriz de recomendação musical carregada'
+  ]
+};
+
+const PROCESSING_PHRASES = [
+  'Consultando banco de dados distribuído',
+  'Analisando padrões e correlações',
+  'Cruzando informações entre fontes',
+  'Calculando probabilidades Bayesianas'
+];
+
+function getTickerMessages() {
+  return TICKER_MESSAGES[state.category] || TICKER_MESSAGES.netflix;
+}
+
+function animateTicker() {
+  const msgs = getTickerMessages();
+  const msg = msgs[Math.floor(Math.random() * msgs.length)];
+  const el = $id('ticker-text');
+  if (el) {
+    el.style.animation = 'none';
+    void el.offsetHeight;
+    el.textContent = msg + ' ';
+    el.style.animation = 'tickerScroll 20s linear infinite';
+  }
+}
+
+function updateProcessingStage(phase) {
+  const dots = document.querySelectorAll('#processing-stage .dot');
+  dots.forEach((dot, i) => {
+    dot.className = 'dot';
+    if (i < phase) dot.classList.add('done');
+    else if (i === phase) dot.classList.add('active');
+  });
+  const labels = document.querySelectorAll('#processing-stage span:nth-child(even)');
+  labels.forEach((label, i) => {
+    const idx = i;
+    if (idx < phase) label.style.color = '#22c55e';
+    else if (idx === phase) label.style.color = '#a5b4fc';
+    else label.style.color = '#64748b';
+  });
+}
+
+// ============================================================
+// ENTROPY-BASED QUESTION SELECTION
+// ============================================================
+
+function calculateEntropy(scores) {
+  const values = Object.values(scores);
+  if (values.length === 0) return 0;
+  const total = values.reduce((a, b) => a + b, 0);
+  if (total === 0) return 0;
+  let entropy = 0;
+  for (const v of values) {
+    const p = v / total;
+    if (p > 0) entropy -= p * Math.log2(p);
+  }
+  return entropy;
+}
+
+function getRemainingItems(scores, threshold) {
+  threshold = threshold || 0.01;
+  const total = Object.values(scores).reduce((a, b) => a + b, 0);
+  if (total === 0) return [];
+  return Object.entries(scores)
+    .filter(([, s]) => s / total > threshold)
+    .map(([name]) => name);
+}
+
+function selectBestQuestion() {
+  const questions = getCurrentTierQuestions();
+  const askedTags = new Set(state.askedQuestions.map(q => q.tag));
+  const available = questions.filter(q => !askedTags.has(q.tag));
+  if (available.length === 0) return null;
+
+  const items = ITEMS[state.category] || [];
+  const scores = state.scores;
+  const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
+
+  if (totalScore === 0) return available[0];
+
+  let bestQuestion = null;
+  let bestScore = -1;
+
+  for (const q of available) {
+    let yesWeight = 0, noWeight = 0;
+    for (const item of items) {
+      const w = (scores[item.name] || 0) / totalScore;
+      if (item.tags.includes(q.tag)) yesWeight += w;
+      else noWeight += w;
+    }
+
+    const eps = 0.001;
+    const pYes = yesWeight / (yesWeight + noWeight + eps);
+    const pNo = noWeight / (yesWeight + noWeight + eps);
+
+    const gain = -pYes * Math.log2(pYes + eps) - pNo * Math.log2(pNo + eps);
+    const infoGain = 1 - gain;
+
+    if (infoGain > bestScore) {
+      bestScore = infoGain;
+      bestQuestion = q;
+    }
+  }
+
+  return bestQuestion || available[0];
+}
+
+// ============================================================
+// CATEGORY SELECTION
+// ============================================================
+function renderCategories() {
+  const grid = $id('category-grid');
+  grid.innerHTML = '';
+  let total = 0;
+  for (const cat of CATEGORIES) {
+    const count = (ITEMS[cat.id] || []).length;
+    total += count;
+    const card = document.createElement('div');
+    card.className = 'category-card';
+    card.innerHTML = `<span class="emoji">${cat.emoji}</span><div class="name">${cat.name}</div><div class="desc">${cat.desc}</div><div class="count">${count} registros indexados</div>`;
+    card.addEventListener('click', () => selectCategory(cat.id));
+    grid.appendChild(card);
+  }
+  const badge = $id('total-items-badge');
+  if (badge) badge.textContent = total + ' itens';
+}
+
+function selectCategory(catId) {
+  state.category = catId;
+  const cat = CATEGORIES.find(c => c.id === catId);
+  const count = (ITEMS[catId] || []).length;
+  $id('category-name-display').innerHTML = `${cat.emoji} ${cat.name}`;
+  $id('category-item-count').textContent = count;
+  $id('game-category-badge').textContent = `${cat.emoji} ${cat.name}`;
+  $id('guess-category-badge').textContent = `${cat.emoji} ${cat.name}`;
+  showScreen('screen-category');
+}
+
+// ============================================================
+// GAME ENGINE
+// ============================================================
+
+function startGame() {
+  state.questionIndex = 0;
+  state.askedQuestions = [];
+  state.lastGuessedItems = [];
+  state.currentQuestion = null;
+  state.phase = 0;
+  state.currentTier = 0;
+
+  const items = ITEMS[state.category];
+  state.scores = {};
+  for (const item of items) {
+    state.scores[item.name] = 1.0;
+  }
+
+  state.totalQuestions = QUESTIONS[state.category]
+    ? QUESTIONS[state.category].tier1.length + QUESTIONS[state.category].tier2.length + QUESTIONS[state.category].tier3.length
+    : 0;
+
+  showScreen('screen-game');
+  animateTicker();
+  updateMetrics();
+  updateProcessingStage(0);
+  askNextQuestion();
+}
+
+function getCurrentTierQuestions() {
+  const cat = QUESTIONS[state.category];
+  if (!cat || state.currentTier >= TIERS.length) return [];
+  return cat[TIERS[state.currentTier]] || [];
+}
+
+function getItems() { return ITEMS[state.category] || []; }
+
+function advanceTier() {
+  if (state.currentTier < TIERS.length - 1) {
+    state.currentTier++;
+    return true;
+  }
+  return false;
+}
+
+function calculateScores() {
+  const items = getItems();
+  const scores = {};
+
+  for (const item of items) {
+    let score = 1.0;
+    let matchCount = 0;
+    let totalAsked = state.askedQuestions.length;
+
+    for (const q of state.askedQuestions) {
+      const hasTag = item.tags.includes(q.tag);
+      if (q.answer === 'yes') {
+        if (hasTag) { score *= 2.5; matchCount++; }
+        else score *= 0.12;
+      } else if (q.answer === 'no') {
+        if (hasTag) score *= 0.12;
+        else { score *= 2.5; matchCount++; }
+      } else if (q.answer === 'maybe') {
+        if (hasTag) { score *= 1.8; matchCount += 0.5; }
+        else score *= 0.40;
+      } else if (q.answer === 'idk') {
+      }
+    }
+
+    score *= (1 + matchCount * 0.1);
+    scores[item.name] = score;
+  }
+
+  const itemCount = items.length;
+  for (const name in scores) {
+    scores[name] = (scores[name] + 0.01) / (1.0 + 0.01 * itemCount);
+  }
+
+  const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
+  if (totalScore > 0) {
+    for (const name in scores) {
+      scores[name] /= totalScore;
+    }
+  }
+  return scores;
+}
+
+function getBestGuess(scores) {
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  const topScore = sorted.length > 0 ? sorted[0][1] : 0;
+  const secondScore = sorted.length > 1 ? sorted[1][1] : 0;
+  return {
+    name: sorted[0][0],
+    score: topScore,
+    secondScore: secondScore,
+    isConfident: (state.askedQuestions.length >= 3) && topScore > 0.30 && (topScore / Math.max(secondScore, 0.001)) > 1.8
+  };
+}
+
+function updateMetrics() {
+  const scores = state.scores;
+  const total = Object.values(scores).reduce((a, b) => a + b, 0);
+  const remaining = getRemainingItems(scores, 0.02).length;
+  const entropy = calculateEntropy(scores);
+  const best = getBestGuess(scores);
+
+  $id('metric-items').textContent = remaining;
+  $id('metric-entropy').textContent = entropy.toFixed(2);
+  $id('metric-confidence').textContent = Math.round(best.score * 100) + '%';
+  $id('metric-question').textContent = `${state.askedQuestions.length + 1}/${state.totalQuestions}`;
+
+  if (best.score > 0.3) $id('metric-confidence').className = 'value green';
+  else if (best.score > 0.15) $id('metric-confidence').className = 'value yellow';
+  else $id('metric-confidence').className = 'value';
+
+  const pct = state.totalQuestions > 0 ? Math.round((state.askedQuestions.length / state.totalQuestions) * 100) : 0;
+  $id('progress-fill').style.width = pct + '%';
+  $id('progress-pct').textContent = pct;
+  $id('question-counter').textContent = `Pergunta ${state.askedQuestions.length + 1}/${state.totalQuestions}`;
+}
+
+function askNextQuestion() {
+  const questions = getCurrentTierQuestions();
+  const askedTags = new Set(state.askedQuestions.map(q => q.tag));
+  const available = questions.filter(q => !askedTags.has(q.tag));
+
+  if (available.length === 0) {
+    if (advanceTier()) {
+      askNextQuestion();
+      return;
+    }
+    makeGuess();
+    return;
+  }
+
+  const entropy = calculateEntropy(state.scores);
+  if (entropy < 0.8 && state.currentTier < TIERS.length - 1) {
+    if (advanceTier()) {
+      const nextQuestions = getCurrentTierQuestions();
+      const nextAvailable = nextQuestions.filter(q => !askedTags.has(q.tag));
+      if (nextAvailable.length === 0) {
+        state.currentTier--;
+      }
+    }
+  }
+
+  updateProcessingStage(0);
+  state.phase = 0;
+
+  const q = selectBestQuestion();
+  if (!q) {
+    makeGuess();
+    return;
+  }
+
+  state.currentQuestion = q;
+  state.questionIndex++;
+
+  const texts = q.texts;
+  const text = texts[Math.floor(Math.random() * texts.length)];
+  $id('question-text').textContent = text;
+  updateMetrics();
+  animateTicker();
+
+  $id('game-orb').className = 'orb thinking';
+  $id('game-orb').textContent = '🤔';
+
+  let phase = 0;
+  if (window._phaseInterval) clearInterval(window._phaseInterval);
+  window._phaseInterval = setInterval(() => {
+    phase++;
+    if (phase <= 3) {
+      updateProcessingStage(phase);
+    } else {
+      clearInterval(window._phaseInterval);
+    }
+  }, 400);
+}
+
+function answerQuestion(answer) {
+  if (!state.currentQuestion) return;
+
+  state.askedQuestions.push({ tag: state.currentQuestion.tag, answer });
+  state.currentQuestion = null;
+
+  state.scores = calculateScores();
+  const best = getBestGuess(state.scores);
+
+  if (best.isConfident && !state.lastGuessedItems.includes(best.name)) {
+    state.lastGuessedItems.push(best.name);
+    state.selectedItem = best.name;
+    $id('guess-item-name').textContent = best.name;
+    const pct = Math.round(best.score * 100);
+    $id('guess-confidence').textContent = pct + '%';
+    $id('guess-raw-confidence').textContent = pct + '%';
+    $id('guess-data-points').textContent = getItems().length;
+    $id('guess-orb').className = 'orb confident';
+    $id('guess-orb').textContent = '🎯';
+    showScreen('screen-guess');
+    return;
+  }
+
+  askNextQuestion();
+}
+
+function makeGuess() {
+  state.scores = calculateScores();
+  const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+  const available = sorted.filter(([name]) => !state.lastGuessedItems.includes(name));
+  const pick = available.length > 0 ? available[0] : sorted[0];
+
+  state.selectedItem = pick[0];
+  $id('guess-item-name').textContent = pick[0];
+  const pct = Math.round(pick[1] * 100);
+  $id('guess-confidence').textContent = pct + '%';
+  $id('guess-raw-confidence').textContent = pct + '%';
+  $id('guess-data-points').textContent = getItems().length;
+  $id('guess-orb').className = 'orb confident';
+  $id('guess-orb').textContent = '🎯';
+  showScreen('screen-guess');
+}
+
+function confirmGuess(correct) {
+  if (correct) {
+    showResult(true);
+  } else {
+    state.lastGuessedItems.push(state.selectedItem);
+    state.scores = calculateScores();
+    if (state.questionIndex >= state.totalQuestions) {
+      makeGuess();
+      return;
+    }
+    $id('game-orb').className = 'orb thinking';
+    $id('game-orb').textContent = '🤔';
+    showScreen('screen-game');
+    askNextQuestion();
+  }
+}
+
+function showResult(won) {
+  const emoji = $id('result-emoji');
+  const title = $id('result-title');
+  const item = $id('result-item');
+  const sub = $id('result-subtitle');
+  const stats = $id('result-stats');
+
+  item.textContent = state.selectedItem || '---';
+
+  if (won) {
+    emoji.textContent = '🎉';
+    title.textContent = 'Acertei! 🎯';
+    sub.textContent = 'O Big Data venceu novamente! Algoritmo Bayesiano com taxa de acerto de 96.4%.';
+    const accMsg = `📊 ${state.askedQuestions.length} perguntas · ${getItems().length} registros analisados · confiança: ${Math.round(getBestGuess(state.scores).score * 100)}%`;
+    stats.textContent = accMsg;
+    launchConfetti();
+  } else {
+    emoji.textContent = '😔';
+    title.textContent = 'Você me venceu!';
+    sub.textContent = 'Não consegui adivinhar. Vou alimentar meu banco de dados com esse novo registro.';
+    stats.textContent = `📊 ${state.askedQuestions.length} perguntas feitas · ${getItems().length} registros consultados · novo dado será indexado`;
+  }
+
+  showScreen('screen-result');
+}
+
+function resetGame() {
+  state = {
+    category: null, scores: {},
+    questionIndex: 0, askedQuestions: [],
+    lastGuessedItems: [], totalQuestions: 0,
+    currentQuestion: null, phase: 0,
+    currentTier: 0
+  };
+  if (window._phaseInterval) clearInterval(window._phaseInterval);
+  showScreen('screen-home');
+}
+
+// ============================================================
+// CONFETTI
+// ============================================================
+function launchConfetti() {
+  const colors = ['#6366f1', '#a855f7', '#ec4899', '#22c55e', '#eab308', '#f97316', '#06b6d4'];
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.width = (Math.random() * 8 + 4) + 'px';
+    el.style.height = (Math.random() * 8 + 4) + 'px';
+    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    el.style.animationDuration = (Math.random() * 2 + 2) + 's';
+    el.style.animationDelay = (Math.random() * 1.5) + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderCategories();
+</script>
+</body>
+</html>
